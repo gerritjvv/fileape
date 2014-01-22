@@ -1,4 +1,14 @@
-fileape
-=======
+# fileape
 
-Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip
+A Clojure library designed to ... well, that part is up to you.
+
+## Usage
+
+FIXME
+
+## License
+
+Copyright © 2014 FIXME
+
+Distributed under the Eclipse Public License either version 1.0 or (at
+your option) any later version.
