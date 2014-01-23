@@ -12,6 +12,7 @@
 
   :dependencies [
                   [fun-utils "0.2.8"]
+                  [org.clojure/tools.logging "0.2.3"]
                   [org.iq80.snappy/snappy "0.3"]
                   [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                   [midje "1.6-alpha2" :scope "test"]

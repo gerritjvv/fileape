@@ -27,7 +27,8 @@
                      ape2 (ape {:codec :gzip :base-dir base-dir})]
                  
                  (doseq [i (range 100)]
-                   (write ape2 "abc-123" (fn [^DataOutputStream o] (.writeInt o (int i)))))
+                   (let [ bts (.getBytes (str i "\n")) ]
+                   (write ape2 "abc-123" (fn [^DataOutputStream o] (.writeInt o (int i))))))
                    
                  (close ape2)
                  
@@ -40,8 +41,7 @@
                                       
                  
                )))
-         
-	         (fact "Write speed test"
+         (fact "Write speed test"
 	               (let [base-dir (File. "target/tests/write-speed-test")
 	                     ape2 (ape {:codec :gzip :base-dir base-dir})
                        bts-1mb (.getBytes (apply str (take 1048576 (repeatedly (fn [] "a")))))
@@ -78,22 +78,22 @@
           
            (fact "Test Services rollover size"
 		               (let [base-dir (File. "target/tests/write-test-rollover-size")
-		                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 100 :rollover-size 100})
+		                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 5000 :rollover-size 100})
                          bts-1mb (.getBytes (apply str (take 1048576 (repeatedly (fn [] "a")))))
                          bts-len (count bts-1mb)
                        
 	                       start (System/currentTimeMillis)]
 		                 
                    
-	                    (doseq [^bytes mb-bts (take 10 (repeatedly (fn [] bts-1mb)))]
+	                    (doseq [^bytes mb-bts (take 1000 (repeatedly (fn [] bts-1mb)))]
                         (write ape2 "abc-123" (fn [^DataOutputStream o] (.write o mb-bts 0 (int bts-len)  ))))
 	                
-	                   (Thread/sleep 2000)
+	                  (while true (Thread/sleep 2000))
+                    
 	                   ;we expect a file here
 	                   (let [files (filter (fn [^File file] (re-find #"abc-123" (.getName file))) (.listFiles base-dir))]
 	                     (prn "Files " (count files)))
 		                                      
 		                 (close ape2)
 		               ))
-          
-          )
+	          )
