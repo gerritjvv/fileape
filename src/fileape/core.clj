@@ -143,7 +143,7 @@
     "Checks and if the file should be rolled its rolled"
     (try
       (do
-			    (.flush out)
+			    ;(.flush out)
 		      (info "Check rollover-size[ " rollover-size "] < " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
 		      (if (or (>= (.length file) rollover-size)
 			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
