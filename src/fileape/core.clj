@@ -2,7 +2,7 @@
   (require 
          [clojure.java.io :refer [make-parents]]
          [fun-utils.core :refer [star-channel apply-get-create fixdelay]]
-         [clojure.core.async :refer [go <! >! <!! >!! chan sliding-buffer ]]
+         [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
          [clojure.string :as clj-str]
          [clojure.tools.logging :refer [info error]])
   (import [java.util.concurrent.atomic AtomicReference]
@@ -55,12 +55,14 @@
     (dosync
         (if-let [file-data (get @file-map-ref file-key)]
                  file-data
-                 (get 
-                   (alter file-map-ref (fn [m] 
-                                         (if (not (get file-key m))
-                                             (assoc m file-key (create-file-data conf file-key))
-                                             m)))
-                   file-key))))
+                 (if-let [file-data (get (alter file-map-ref (fn [m] 
+												                                         (if (not (get file-key m))
+												                                             (assoc m file-key (create-file-data conf file-key))
+												                                             m)))
+                                                         file-key)]
+                   file-data
+                   (get-file-data conf file-key)))))
+                       
                    
                    
    (defn write-to-file-data [file-data error-ch writer-f]
@@ -97,7 +99,7 @@
       (do 
         (.flush out)
         (.close out))
-      (catch Exception e (.printStackTrace e)))
+      (catch Exception e (error e e)))
     (let [file2 (File. (.getParent file)
                        (add-file-name-index
                          (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
@@ -107,14 +109,15 @@
         (do 
           (info "Rename " (.getName file) " to " (.getName file2))
           (.renameTo file file2)
+          file2
           ))))
   
    (defn roll-and-notify [file-map-ref roll-ch file-data]
      "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
      (dosync (alter file-map-ref (fn [m] 
                                   (dissoc m (:file-key file-data)))))
-     (close-and-roll file-data 0)
-     (>!! roll-ch file-data))
+     (let [file (close-and-roll file-data 0)]
+       (>!! roll-ch (assoc file-data :file file))))
      
   (defn close [{:keys [star file-map-ref error-ch roll-ch]}]
     "Close each open file, and notify a roll event to the roll-ch channel
@@ -136,17 +139,21 @@
    (defn check-file-data-roll [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]} 
                               {:keys [file-key ^File file updated out] :as file-data}]
     "Checks and if the file should be rolled its rolled"
-	    (.flush out)
-      (info "Check " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
-      (if (or (>= (.length file) rollover-size)
-	            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
-	      ((:send star) file-key
-	                    #(roll-and-notify file-map-ref roll-ch %) file-data)))
+    (try
+      (do
+			    (.flush out)
+		      (info "Check rollover-size[ " rollover-size "] < " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
+		      (if (or (>= (.length file) rollover-size)
+			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
+			      ((:send star) file-key
+			                    #(roll-and-notify file-map-ref roll-ch %) file-data)))
+      (catch Exception e (error e e))))
 	    
   (defn check-roll [{:keys [star file-map-ref] :as conn}]
-    (doseq [[k file-data] @file-map-ref]
-      ((:send star) k
-                    #(check-file-data-roll conn %) file-data)))
+    (try
+      (doseq [[k file-data] @file-map-ref]
+          (check-file-data-roll conn file-data))
+      (catch Exception e (error e e))))
   
   (defn start-services [conn]
      (info "fixdelay " (:check-freq conn))
@@ -177,9 +184,12 @@
             (loop []
 	            (if-let [v (<! roll-ch)]
 	              (do 
+                   (info "roll-callbacks " v)
 	                 (try
 		                  (doseq [f roll-callbacks]
-		                    (f v))
+		                    (thread (try 
+                                    (f v)
+                                    (catch Exception e (error e e)))))
 		                (catch Exception e (.printStackTrace e)))
                   (recur))))))
 	        
