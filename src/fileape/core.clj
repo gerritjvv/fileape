@@ -91,6 +91,8 @@
 	         (clj-str/join "" (flatten  [(drop-last s1) 
 	                                         i
 	                                         "."
+                                           (System/nanoTime)
+                                           "."
 	                                      (last s1)])))))
          
   (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
