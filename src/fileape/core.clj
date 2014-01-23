@@ -85,15 +85,13 @@
                           ))
   
   (defn add-file-name-index [n i]
-    (if (= i 0)
-      n
-	    (let [s1 (interpose "." (-> n (clj-str/split #"\.")))]
+    (let [s1 (interpose "." (-> n (clj-str/split #"\.")))]
 	         (clj-str/join "" (flatten  [(drop-last s1) 
 	                                         i
 	                                         "."
                                            (System/nanoTime)
                                            "."
-	                                      (last s1)])))))
+	                                      (last s1)]))))
          
   (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
     "Close the output stream and rename the file by removing the last _[number] suffix"
