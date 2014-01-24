@@ -92,7 +92,8 @@
                                            (System/nanoTime)
                                            "."
 	                                      (last s1)]))))
-         
+
+  
   (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
     "Close the output stream and rename the file by removing the last _[number] suffix"
     (try
@@ -122,15 +123,14 @@
   (defn close [{:keys [star file-map-ref error-ch roll-ch]}]
     "Close each open file, and notify a roll event to the roll-ch channel
      any errors are reported to the error-ch channel"
-    (info "close !!!!!!!!!! " @file-map-ref)
+    ;(info "close !!!!!!!!!! " @file-map-ref)
     (doseq [[k file-data] @file-map-ref]
       (try 
         (do
           ;we send close on the channel star, to coordinate close and writes
           ((:send star) true ;;wait for response
                          (:file-key file-data)
-                         #(roll-and-notify file-map-ref roll-ch %) file-data))
-        
+                         [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data))
         (catch Exception e (do (prn e e )(>!! error-ch e))))))
   
   ;;{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]} 
@@ -183,13 +183,11 @@
           (go
             (loop []
 	            (if-let [v (<! roll-ch)]
-	              (do 
-                   (info "roll-callbacks " v)
-	                 (try
+	               (do
+                   (try
 		                  (doseq [f roll-callbacks]
-		                    (thread (try 
-                                    (f v)
-                                    (catch Exception e (error e e)))))
+		                    (info "before roll") (f v) (info "after roll"))
+                    
 		                (catch Exception e (.printStackTrace e)))
                   (recur))))))
 	        
