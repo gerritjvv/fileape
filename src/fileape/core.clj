@@ -27,6 +27,7 @@
       (= codec :gzip)
       (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576))) ))]
         {:out zipout})
+      
       (= codec :none)
         {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
       :else
@@ -80,7 +81,11 @@
 		  ((:send star) file-key
                           ;this function will run in a channel in sync with other instances of the same topic
 		                      (fn [writer-f]
-		                          (write-to-file-data (get-file-data conn file-key) error-ch writer-f))
+                            (try 
+		                          (write-to-file-data (get-file-data conn file-key) error-ch writer-f)
+                              (catch java.io.IOException ioe ;if io exception retry with a new get-file-data
+                                (write-to-file-data (get-file-data conn file-key) error-ch writer-f)
+                                )))
                           writer-f
                           ))
   
@@ -112,7 +117,7 @@
           (.renameTo file file2)
           file2
           ))))
-  
+ 
    (defn roll-and-notify [file-map-ref roll-ch file-data]
      "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
      (dosync (alter file-map-ref (fn [m] 
@@ -142,7 +147,7 @@
     (try
       (do
 			    ;(.flush out)
-		      (info "Check rollover-size[ " rollover-size "] < " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
+		      ;(info "Check rollover-size[ " rollover-size "] < " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
 		      (if (or (>= (.length file) rollover-size)
 			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
 			      ((:send star) file-key
