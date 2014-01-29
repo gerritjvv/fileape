@@ -7,6 +7,7 @@ on a timeout or size.
 
 ## Usage
 
+```[fileape "0.3.0-SNAPSHOT"]```
 
 ```clojure
 
