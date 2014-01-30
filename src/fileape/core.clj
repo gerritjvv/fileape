@@ -1,7 +1,7 @@
 (ns fileape.core
   (require 
          [clojure.java.io :refer [make-parents]]
-         [fun-utils.core :refer [star-channel apply-get-create fixdelay]]
+         [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
          [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
          [clojure.string :as clj-str]
          [clojure.tools.logging :refer [info error]])
@@ -125,7 +125,7 @@
      (let [file (close-and-roll file-data 0)]
        (>!! roll-ch (assoc file-data :file file))))
      
-  (defn close [{:keys [star file-map-ref error-ch roll-ch]}]
+  (defn close [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch]}]
     "Close each open file, and notify a roll event to the roll-ch channel
      any errors are reported to the error-ch channel"
     ;(info "close !!!!!!!!!! " @file-map-ref)
@@ -133,10 +133,13 @@
       (try 
         (do
           ;we send close on the channel star, to coordinate close and writes
+          (stop-fixdelay fix-delay-ch)
           ((:send star) true ;;wait for response
                          (:file-key file-data)
                          [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data))
-        (catch Exception e (do (prn e e )(>!! error-ch e))))))
+        (catch Exception e (do (prn e e )(>!! error-ch e)))))
+    
+    ((:close star)))
   
   ;;{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]} 
   ;;                            {:keys [file-key ^File file updated out] :as file-data}
@@ -159,11 +162,6 @@
       (doseq [[k file-data] @file-map-ref]
           (check-file-data-roll conn file-data))
       (catch Exception e (error e e))))
-  
-  (defn start-services [conn]
-     (info "fixdelay " (:check-freq conn))
-     (fixdelay (:check-freq conn)
-                (check-roll conn)))
   
   (defn ape [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000}}]
     "Entrypoint to the api, creates the resources for writing"
@@ -196,5 +194,5 @@
 		                (catch Exception e (.printStackTrace e)))
                   (recur))))))
 	        
-	       (start-services conn)
-	       conn))
+	       (assoc conn :fix-delay-ch (fixdelay (:check-freq conn)
+                                           (check-roll conn)))))

@@ -38,7 +38,6 @@
                    (sort 
                      (take 100 (let [o (-> file FileInputStream. GZIPInputStream. DataInputStream.)]
                                      (repeatedly #(.readInt o))))) => (range 100)
-                                      
                  
                )))
          (fact "Write speed test"
