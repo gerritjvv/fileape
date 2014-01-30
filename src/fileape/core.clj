@@ -35,7 +35,8 @@
  
   (defn ^File create-file [base-dir codec file-key]
     "Create and return a File object with the name based on the file key codec and base dir"
-       (File. base-dir (str file-key 
+       (File. (clojure.java.io/file base-dir)
+              (str file-key 
                             (codec-extension codec)
                             "_" (System/nanoTime))))
       
@@ -73,7 +74,7 @@
        (catch Exception e (do
                             (error e e)
                             (>!! error-ch e))))
-     (.set (:updated file-data) (System/currentTimeMillis)))
+     (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
   
   (defn write [{:keys [star error-ch] :as conn} file-key writer-f]
     "Writes the data in a thread safe manner to the file output stream based on the file-key
@@ -99,15 +100,15 @@
 	                                      (last s1)]))))
 
   
-  (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
+  (defn close-and-roll [{:keys [^File file ^OutputStream out] :as file-data} i]
     "Close the output stream and rename the file by removing the last _[number] suffix"
     (try
       (do 
         (.flush out)
         (.close out))
       (catch Exception e (error e e)))
-    (let [file2 (File. (.getParent file)
-                       (add-file-name-index
+    (let [file2 (File. ^File (.getParent file)
+                       ^String (add-file-name-index
                          (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
                          i))]
       (if (.exists file2)
@@ -189,9 +190,9 @@
 	               (do
                    (try
 		                  (doseq [f roll-callbacks]
-		                    (info "before roll") (f v) (info "after roll"))
+		                    (f v))
                     
-		                (catch Exception e (.printStackTrace e)))
+		                (catch Exception e (error e e)))
                   (recur))))))
 	        
 	       (assoc conn :fix-delay-ch (fixdelay (:check-freq conn)
