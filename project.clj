@@ -11,7 +11,7 @@
                 *assert* false}
 
   :dependencies [
-                  [fun-utils "0.3.4"]
+                  [fun-utils "0.3.6"]
                   [org.clojure/tools.logging "0.2.3"]
                   [org.iq80.snappy/snappy "0.3"]
                   [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
