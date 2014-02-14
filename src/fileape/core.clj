@@ -100,14 +100,14 @@
 	                                      (last s1)]))))
 
   
-  (defn close-and-roll [{:keys [^File file ^OutputStream out] :as file-data} i]
+  (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
     "Close the output stream and rename the file by removing the last _[number] suffix"
     (try
       (do 
         (.flush out)
         (.close out))
       (catch Exception e (error e e)))
-    (let [file2 (File. ^File (.getParent file)
+    (let [file2 (File. (.getParent ^File (clojure.java.io/file file))
                        ^String (add-file-name-index
                          (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
                          i))]
