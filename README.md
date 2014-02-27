@@ -18,10 +18,10 @@ on a timeout or size.
    (prn "File rolled " file))
 
 (def ape2 (ape {:codec :gzip
-		:base-dir (get-conf2 :writer-basedir "target") 
-                :check-freq (get-conf2 :writer-check-freq 5000) 
-                :rollover-size (get-conf2 :roll-size 134217728)
-                :rollover-timeout (get-conf2 :roll-timeout 60000)
+		:base-dir "testdir" 
+                :check-freq 5000
+                :rollover-size :roll-size 134217728
+                :rollover-timeout :roll-timeout 60000
                 :roll-callbacks [callback-f]}))
 
 (write ape2 "abc-123" (fn [^DataOutputStream o] 
