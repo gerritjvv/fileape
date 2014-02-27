@@ -14,9 +14,19 @@ on a timeout or size.
 (require '[fileape.core :refer :all])
 (import '[java.io File DataOutputStream])
 
-(def ape2 (ape {:codec :gzip}))
+(defn callback-f [{:keys [file]}]
+   (prn "File rolled " file))
+
+(def ape2 (ape {:codec :gzip
+		:base-dir (get-conf2 :writer-basedir "target") 
+                :check-freq (get-conf2 :writer-check-freq 5000) 
+                :rollover-size (get-conf2 :roll-size 134217728)
+                :rollover-timeout (get-conf2 :roll-timeout 60000)
+                :roll-callbacks [callback-f]}))
+
 (write ape2 "abc-123" (fn [^DataOutputStream o] 
                                                  (.writeInt o (int 1))))
+
 
 (close ape2)
                
