@@ -20,8 +20,8 @@ on a timeout or size.
 (def ape2 (ape {:codec :gzip
 		:base-dir "testdir" 
                 :check-freq 5000
-                :rollover-size :roll-size 134217728
-                :rollover-timeout :roll-timeout 60000
+                :rollover-size 134217728
+                :rollover-timeout 60000
                 :roll-callbacks [callback-f]}))
 
 (write ape2 "abc-123" (fn [^DataOutputStream o] 
