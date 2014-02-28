@@ -5,8 +5,9 @@
          [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
          [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
          [clojure.string :as clj-str]
+         
          [clojure.tools.logging :refer [info error]])
-  (import [java.util.concurrent.atomic AtomicReference]
+  (import [java.util.concurrent.atomic AtomicReference AtomicInteger]
           [java.util.zip GZIPOutputStream]
           [java.io File BufferedOutputStream DataOutputStream FileOutputStream OutputStream]))
 		    
@@ -30,7 +31,7 @@
       (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576))) ))]
         {:out zipout})
       (= codec :native-gzip)
-      (create-native-gzip file)
+        {:out (create-native-gzip file)}
       (= codec :none)
         {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
       :else
@@ -79,19 +80,26 @@
                             (>!! error-ch e))))
      (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
   
+  (defn- create-parallel-key [{:keys [ ^AtomicInteger parallel-count parallel-files ]} file-key]
+    (let [i (.getAndIncrement parallel-count)]
+      (if (> i parallel-files)
+        (.set parallel-count 0))
+      (str file-key "." i)))
+  
   (defn write [{:keys [star error-ch] :as conn} file-key writer-f]
     "Writes the data in a thread safe manner to the file output stream based on the file-key
      If no output stream exists one is created"
-		  ((:send star) file-key
+    (let [k (create-parallel-key conn file-key)]
+		  ((:send star) k
                           ;this function will run in a channel in sync with other instances of the same topic
 		                      (fn [writer-f]
                             (try 
-		                          (write-to-file-data (get-file-data conn file-key) error-ch writer-f)
+		                          (write-to-file-data (get-file-data conn k) error-ch writer-f)
                               (catch java.io.IOException ioe ;if io exception retry with a new get-file-data
-                                (write-to-file-data (get-file-data conn file-key) error-ch writer-f)
+                                (write-to-file-data (get-file-data conn k) error-ch writer-f)
                                 )))
                           writer-f
-                          ))
+                          )))
   
   (defn add-file-name-index [n i]
     (let [s1 (interpose "." (-> n (clj-str/split #"\.")))]
@@ -167,7 +175,8 @@
           (check-file-data-roll conn file-data))
       (catch Exception e (error e e))))
   
-  (defn ape [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000}}]
+  (defn ape [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks
+                     parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 2}}]
     "Entrypoint to the api, creates the resources for writing"
      (let [error-ch (chan (sliding-buffer 10))
            roll-ch (chan (sliding-buffer 100))
@@ -182,6 +191,8 @@
 					        :rollover-timeout rollover-timeout
 					        :check-freq check-freq
 					        :error-ch error-ch
+                  :parallel-files parallel-files
+                  :parallel-count (AtomicInteger. (int 0))
 					        :roll-ch roll-ch}]
        
         (info "start file check " check-freq " rollover-sise "rollover-size " rollover-timeout "rollover-timeout)
