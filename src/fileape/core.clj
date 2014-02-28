@@ -80,12 +80,24 @@
                             (>!! error-ch e))))
      (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
   
-  (defn- create-parallel-key [{:keys [ ^AtomicInteger parallel-count parallel-files ]} file-key]
-    (let [i (.getAndIncrement parallel-count)]
-      (if (> i parallel-files)
-        (.set parallel-count 0))
-      (str file-key "." i)))
-  
+  (defn- get-parallel-counter [parallel-counts file-key]
+    (if-let [counter (get @parallel-counts file-key)]
+      counter
+      (get 
+          (dosync 
+           (commute parallel-counts assoc file-key (AtomicInteger.)))
+          file-key)))
+      
+  (defn- create-parallel-key [{:keys [ parallel-counts parallel-files ]} file-key]
+    "Gets the AtomicInteger from the parallel-counts and return file-key '.' (inc count)"
+    (let [^AtomicInteger counter (get-parallel-counter parallel-counts file-key)
+          c (.getAndIncrement counter)]
+      (if (> c parallel-files)
+        (do
+          (.set counter 0)
+          (str file-key "." 0))
+        (str file-key "." c))))
+      
   (defn write [{:keys [star error-ch] :as conn} file-key writer-f]
     "Writes the data in a thread safe manner to the file output stream based on the file-key
      If no output stream exists one is created"
@@ -130,14 +142,17 @@
           file2
           ))))
  
-   (defn roll-and-notify [file-map-ref roll-ch file-data]
+   (defn roll-and-notify [parallel-counts file-map-ref roll-ch file-data]
      "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
      (dosync (alter file-map-ref (fn [m] 
                                   (dissoc m (:file-key file-data)))))
+     
+     (dosync (commute parallel-counts dissoc (:file-key file-data)))
+     
      (let [file (close-and-roll file-data 0)]
        (>!! roll-ch (assoc file-data :file file))))
      
-  (defn close [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch]}]
+  (defn close [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch parallel-counts]}]
     "Close each open file, and notify a roll event to the roll-ch channel
      any errors are reported to the error-ch channel"
     ;(info "close !!!!!!!!!! " @file-map-ref)
@@ -148,7 +163,7 @@
           (stop-fixdelay fix-delay-ch)
           ((:send star) true ;;wait for response
                          (:file-key file-data)
-                         [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data))
+                         [:remove #(roll-and-notify parallel-counts file-map-ref roll-ch %)] file-data))
         (catch Exception e (do (prn e e )(>!! error-ch e)))))
     
     ((:close star)))
@@ -156,7 +171,7 @@
   ;;{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]} 
   ;;                            {:keys [file-key ^File file updated out] :as file-data}
   
-   (defn check-file-data-roll [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]} 
+   (defn check-file-data-roll [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout parallel-counts]} 
                               {:keys [file-key ^File file updated out] :as file-data}]
     "Checks and if the file should be rolled its rolled"
     (try
@@ -166,7 +181,7 @@
 		      (if (or (>= (.length file) rollover-size)
 			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
 			      ((:send star) file-key
-			                    #(roll-and-notify file-map-ref roll-ch %) file-data)))
+			                    #(roll-and-notify parallel-counts file-map-ref roll-ch %) file-data)))
       (catch Exception e (error e e))))
 	    
   (defn check-roll [{:keys [star file-map-ref] :as conn}]
@@ -176,7 +191,7 @@
       (catch Exception e (error e e))))
   
   (defn ape [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks
-                     parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 2}}]
+                     parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3}}]
     "Entrypoint to the api, creates the resources for writing"
      (let [error-ch (chan (sliding-buffer 10))
            roll-ch (chan (sliding-buffer 100))
@@ -192,7 +207,7 @@
 					        :check-freq check-freq
 					        :error-ch error-ch
                   :parallel-files parallel-files
-                  :parallel-count (AtomicInteger. (int 0))
+                  :parallel-counts (ref {})
 					        :roll-ch roll-ch}]
        
         (info "start file check " check-freq " rollover-sise "rollover-size " rollover-timeout "rollover-timeout)

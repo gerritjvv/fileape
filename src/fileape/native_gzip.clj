@@ -35,4 +35,5 @@
     (close []
       (.close out)
       (.close fout)
+      (.reset compressor)
       (>!! @compressor-cache compressor)))))
