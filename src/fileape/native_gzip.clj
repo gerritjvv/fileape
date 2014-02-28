@@ -28,8 +28,8 @@
     (throw (RuntimeException. "No native gzip library found")))
   
   (let [^Compressor compressor (<!! @compressor-cache)
-        ^OutputStream fout (FileOutputStream. (clojure.java.io/file file))
-        ^OutputStream out (BufferedOutputStream. (.createOutputStream gzip-codec fout compressor) (* 10 1048576))]
+        ^OutputStream fout (BufferedOutputStream. (FileOutputStream. (clojure.java.io/file file)) (* 10 1048576))
+        ^OutputStream out  (.createOutputStream gzip-codec fout compressor)]
   (proxy [ProxyOutputStream]
     [out]
     (close []
