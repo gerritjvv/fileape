@@ -1,6 +1,7 @@
 (ns fileape.core
   (require 
          [clojure.java.io :refer [make-parents]]
+         [fileape.native-gzip :refer [create-native-gzip]]
          [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
          [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
          [clojure.string :as clj-str]
@@ -13,6 +14,7 @@
   (defn codec-extension [codec]
     (cond 
       (= codec :gzip)   ".gz"
+      (= codec :native-gzip) ".gz"
       (= codec :lzo)    ".lzo"
       (= codec :snappy) ".snz"
       (= codec :bzip2)  ".bz2"
@@ -27,7 +29,8 @@
       (= codec :gzip)
       (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576))) ))]
         {:out zipout})
-      
+      (= codec :native-gzip)
+      (create-native-gzip file)
       (= codec :none)
         {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
       :else

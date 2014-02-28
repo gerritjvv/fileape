@@ -10,7 +10,11 @@
   :global-vars {*warn-on-reflection* true
                 *assert* false}
 
+  :javac-options ["-target" "1.5" "-source" "1.5" "-Xlint:-options"] 
+  :java-source-paths ["java"]
+ 
   :dependencies [
+                  [org.apache.hadoop/hadoop-core "1.2.1" :scope "provided"]
                   [fun-utils "0.4.1"]
                   [org.clojure/tools.logging "0.2.3"]
                   [org.iq80.snappy/snappy "0.3"]
