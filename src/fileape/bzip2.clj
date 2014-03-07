@@ -1,17 +1,16 @@
-(ns fileape.native-gzip
+(ns fileape.bzip2
   (:refer-clojure :exclude [write])
   (:require [clojure.core.async :refer [chan <!! >!! dropping-buffer]])
   (:import  [java.io OutputStream FileOutputStream BufferedOutputStream]
             [fileape ProxyOutputStream]
-            [org.apache.hadoop.io.compress Compressor GzipCodec]
+            [org.apache.hadoop.io.compress Compressor BZip2Codec]
             [org.apache.hadoop.conf Configurable Configuration]))
 
 (defonce compressor-cache-size 100)
 
-
 (defonce conf (Configuration.))
 
-(defonce ^GzipCodec gzip-codec (do (let [codec (GzipCodec.)]
+(defonce ^BZip2Codec bzip2-codec (do (let [codec (BZip2Codec.)]
                                      (if (instance? Configurable codec)
                                        (.setConf codec conf))
                                      codec)))
@@ -21,18 +20,15 @@
 (defonce compressor-cache (delay
                             (let [cache (chan (dropping-buffer (inc compressor-cache-size)))]
                               (dotimes [i compressor-cache-size]
-                                (>!! cache (.createCompressor gzip-codec)))
+                                (>!! cache (.createCompressor bzip2-codec)))
                               cache)))
 
-(defn create-native-gzip [file]
-  
-  (if (nil? (.createCompressor gzip-codec))
-    (throw (RuntimeException. "No native gzip library found")))
-  
+
+(defn create-bzip2 [file]
   (let [^Compressor compressor (let [^Compressor compressor (<!! @compressor-cache)]
                                  (.reinit compressor conf) compressor)
         ^OutputStream fout (BufferedOutputStream. (FileOutputStream. (clojure.java.io/file file)) (* 10 1048576))
-        ^OutputStream out  (.createOutputStream gzip-codec fout compressor)]
+        ^OutputStream out  (.createOutputStream bzip2-codec fout compressor)]
   (proxy [ProxyOutputStream]
     [out]
     (close []

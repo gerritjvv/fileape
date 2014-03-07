@@ -2,12 +2,14 @@
   (require 
          [clojure.java.io :refer [make-parents]]
          [fileape.native-gzip :refer [create-native-gzip]]
+         [fileape.bzip2 :refer [create-bzip2]]
          [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
          [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
          [clojure.string :as clj-str]
-         
          [clojure.tools.logging :refer [info error]])
+  
   (import [java.util.concurrent.atomic AtomicReference AtomicInteger]
+          [org.xerial.snappy SnappyOutputStream]
           [java.util.zip GZIPOutputStream]
           [java.io File BufferedOutputStream DataOutputStream FileOutputStream OutputStream]))
 		    
@@ -16,7 +18,6 @@
     (cond 
       (= codec :gzip)   ".gz"
       (= codec :native-gzip) ".gz"
-      (= codec :lzo)    ".lzo"
       (= codec :snappy) ".snz"
       (= codec :bzip2)  ".bz2"
       (= codec :none) ".none"
@@ -32,6 +33,10 @@
         {:out zipout})
       (= codec :native-gzip)
         {:out (create-native-gzip file)}
+      (= codec :bzip2)
+        {:out (create-bzip2 file)}
+      (= codec :snappy)
+        {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))}
       (= codec :none)
         {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
       :else
@@ -62,8 +67,9 @@
         (if-let [file-data (get @file-map-ref file-key)]
                  file-data
                  (if-let [file-data (get (alter file-map-ref (fn [m] 
-												                                         (if (not (get file-key m))
-												                                             (assoc m file-key (create-file-data conf file-key))
+												                                         (if (not (get file-key m))   
+                                                                     ;we use delay because the transaction can be repeated and if not delayed might create ghost files.
+												                                             (assoc m file-key (delay (create-file-data conf file-key)))
 												                                             m)))
                                                          file-key)]
                    file-data
@@ -106,7 +112,7 @@
                           ;this function will run in a channel in sync with other instances of the same topic
 		                      (fn [writer-f]
                             (try 
-		                          (write-to-file-data (get-file-data conn k) error-ch writer-f)
+		                          (write-to-file-data (force (get-file-data conn k)) error-ch writer-f)
                               (catch java.io.IOException ioe ;if io exception retry with a new get-file-data
                                 (write-to-file-data (get-file-data conn k) error-ch writer-f)
                                 )))
@@ -126,7 +132,8 @@
   (defn close-and-roll [{:keys [file ^OutputStream out] :as file-data} i]
     "Close the output stream and rename the file by removing the last _[number] suffix"
     (try
-      (do 
+      (do
+        (info "close and roll " file)
         (.flush out)
         (.close out))
       (catch Exception e (error e e)))
@@ -155,7 +162,7 @@
   (defn close [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch parallel-counts]}]
     "Close each open file, and notify a roll event to the roll-ch channel
      any errors are reported to the error-ch channel"
-    ;(info "close !!!!!!!!!! " @file-map-ref)
+    (info "close !!!!!!!!!! " @file-map-ref)
     (doseq [[k file-data] @file-map-ref]
       (try 
         (do
@@ -163,7 +170,7 @@
           (stop-fixdelay fix-delay-ch)
           ((:send star) true ;;wait for response
                          (:file-key file-data)
-                         [:remove #(roll-and-notify parallel-counts file-map-ref roll-ch %)] file-data))
+                         [:remove #(roll-and-notify parallel-counts file-map-ref roll-ch %)] (force file-data)))
         (catch Exception e (do (prn e e )(>!! error-ch e)))))
     
     ((:close star)))
@@ -181,13 +188,13 @@
 		      (if (or (>= (.length file) rollover-size)
 			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
 			      ((:send star) file-key
-			                    #(roll-and-notify parallel-counts file-map-ref roll-ch %) file-data)))
+			                    #(roll-and-notify parallel-counts file-map-ref roll-ch %) (force file-data))))
       (catch Exception e (error e e))))
 	    
   (defn check-roll [{:keys [star file-map-ref] :as conn}]
     (try
       (doseq [[k file-data] @file-map-ref]
-          (check-file-data-roll conn file-data))
+          (check-file-data-roll conn (force file-data)))
       (catch Exception e (error e e))))
   
   (defn ape [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks

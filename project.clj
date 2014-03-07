@@ -14,10 +14,10 @@
   :java-source-paths ["java"]
  
   :dependencies [
-                  [org.apache.hadoop/hadoop-core "1.2.1" :scope "provided"]
+                  [org.apache.hadoop/hadoop-common "2.2.0"]
                   [fun-utils "0.4.1"]
                   [org.clojure/tools.logging "0.2.3"]
-                  [org.iq80.snappy/snappy "0.3"]
+                  [org.xerial.snappy/snappy-java "1.1.0"]
                   [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                   [midje "1.6-alpha2" :scope "test"]
                   [org.apache.hadoop/hadoop-core "0.20.2" :scope "provided" :exclusions [hsqldb]]
