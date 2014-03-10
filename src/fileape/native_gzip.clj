@@ -1,8 +1,7 @@
 (ns fileape.native-gzip
   (:refer-clojure :exclude [write])
   (:require [clojure.core.async :refer [chan <!! >!! dropping-buffer]])
-  (:import  [java.io OutputStream FileOutputStream BufferedOutputStream]
-            [fileape ProxyOutputStream]
+  (:import  [java.io OutputStream FileOutputStream BufferedOutputStream DataOutputStream]
             [org.apache.hadoop.io.compress Compressor GzipCodec]
             [org.apache.hadoop.conf Configurable Configuration]))
 
@@ -29,13 +28,13 @@
   (if (nil? (.createCompressor gzip-codec))
     (throw (RuntimeException. "No native gzip library found")))
   
-  (let [^Compressor compressor (let [^Compressor compressor (<!! @compressor-cache)]
-                                 (.reinit compressor conf) compressor)
+  (let [^Compressor compressor (<!! @compressor-cache)
         ^OutputStream fout (BufferedOutputStream. (FileOutputStream. (clojure.java.io/file file)) (* 10 1048576))
         ^OutputStream out  (.createOutputStream gzip-codec fout compressor)]
-  (proxy [ProxyOutputStream]
+  (proxy [DataOutputStream]
     [out]
     (close []
+      (.finish compressor)
       (.close out)
       (.close fout)
       (.reset compressor)

@@ -1,8 +1,7 @@
 (ns fileape.bzip2
   (:refer-clojure :exclude [write])
   (:require [clojure.core.async :refer [chan <!! >!! dropping-buffer]])
-  (:import  [java.io OutputStream FileOutputStream BufferedOutputStream]
-            [fileape ProxyOutputStream]
+  (:import  [java.io OutputStream FileOutputStream BufferedOutputStream DataOutputStream]
             [org.apache.hadoop.io.compress Compressor BZip2Codec]
             [org.apache.hadoop.conf Configurable Configuration]))
 
@@ -25,13 +24,13 @@
 
 
 (defn create-bzip2 [file]
-  (let [^Compressor compressor (let [^Compressor compressor (<!! @compressor-cache)]
-                                 (.reinit compressor conf) compressor)
+  (let [^Compressor compressor (<!! @compressor-cache)
         ^OutputStream fout (BufferedOutputStream. (FileOutputStream. (clojure.java.io/file file)) (* 10 1048576))
         ^OutputStream out  (.createOutputStream bzip2-codec fout compressor)]
-  (proxy [ProxyOutputStream]
+  (proxy [DataOutputStream]
     [out]
     (close []
+      (.finish compressor)
       (.close out)
       (.close fout)
       (.reset compressor)
