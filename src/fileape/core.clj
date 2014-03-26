@@ -2,6 +2,7 @@
   (require 
          [clojure.java.io :refer [make-parents]]
          [fileape.native-gzip :refer [create-native-gzip]]
+         [fileape.native-lzo :refer [create-native-lzo]]
          [fileape.bzip2 :refer [create-bzip2]]
          [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
          [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer ]]
@@ -20,6 +21,7 @@
       (= codec :native-gzip) ".gz"
       (= codec :snappy) ".snz"
       (= codec :bzip2)  ".bz2"
+      (= codec :lzo) ".lzo"
       (= codec :none) ".none"
       :else 
       (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
@@ -35,6 +37,8 @@
         {:out (create-native-gzip file)}
       (= codec :bzip2)
         {:out (create-bzip2 file)}
+      (= codec :lzo)
+        {:out (create-native-lzo file)}
       (= codec :snappy)
         {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))}
       (= codec :none)
