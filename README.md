@@ -93,6 +93,39 @@ public class Test {
 
 ```
 
+## LZO 
+
+LZO is distributed under the GPL 3 license and therefore fileape needs to come in two versions fileape (apache2) and fileape-lzo (gpl).
+
+The api is exactly the same with the difference to the license and the extra libraries required for lzo compression.
+
+For more information on setting up lzo correctly see: https://code.google.com/p/hadoop-gpl-packing/
+
+```[fileape-lzo "0.4.4-SNAPSHOT"]```
+
+```clojure
+
+(require '[fileape.core :refer :all])
+(import '[java.io File DataOutputStream])
+
+(defn callback-f [{:keys [file]}]
+   (prn "File rolled " file))
+
+(def ape2 (ape {:codec :lzo
+		:base-dir "testdir" 
+                :check-freq 5000
+                :rollover-size 134217728
+                :rollover-timeout 60000
+                :roll-callbacks [callback-f]}))
+
+(write ape2 "abc-123" (fn [^DataOutputStream o] 
+                                                 (.writeInt o (int 1))))
+
+
+(close ape2)
+               
+``` 
+
 ## License
 
 
