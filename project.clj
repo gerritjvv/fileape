@@ -12,7 +12,6 @@
 
   :javac-options ["-target" "1.5" "-source" "1.5" "-Xlint:-options"] 
   :java-source-paths ["java"]
- 
   :dependencies [
                   [org.apache.hadoop/hadoop-common "2.2.0" :scope "provided"]
                   [fun-utils "0.4.1"]
