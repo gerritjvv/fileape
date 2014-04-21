@@ -58,11 +58,12 @@
 
   (defn- create-future-file-name
     "Create the filename that would be written once the file has been rolled"
-    [file i]
-    (.getParent ^File (clojure.java.io/file file))
-                       ^String (add-file-name-index
-                         (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
-                         i))
+    [f i]
+    (let [^File file (clojure.java.io/file f)]
+      (.getParent file
+                  ^String (add-file-name-index
+                           (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
+                           i))))
 
   (defn create-file-data
     "Create a file and return a map with keys file codec file-key out,
@@ -96,11 +97,12 @@
 
 
    (defn write-to-file-data
-     "Extracts the output stream from file-data and calls writer-f with the former as its argument"
+     "Calls writer-f with the file-data"
      [file-data error-ch writer-f]
      (try
-       (writer-f (:out file-data))
+       (writer-f file-data)
        (catch Exception e (do
+                            (.printStackTrace e)
                             (error e e)
                             (>!! error-ch e))))
      (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
@@ -152,14 +154,14 @@
 
   (defn close-and-roll
     "Close the output stream and rename the file by removing the last _[number] suffix"
-    [{:keys [file ^OutputStream out ^String future-file-name] :as file-data} i]
+    [{:keys [^File file ^OutputStream out ^String future-file-name] :as file-data} i]
     (try
       (do
         (info "close and roll " file)
         (.flush out)
         (.close out))
-      (catch Exception e (error e e)))
-    (let [file2 (File. future-file-name)]
+      (catch Exception e (prn e e)))
+    (let [^File file2 (File. future-file-name)]
       (if (.exists file2)
         (close-and-roll (assoc file-data :future-file-name (create-future-file-name file i)) (inc i))
         (do
@@ -184,6 +186,13 @@
      any errors are reported to the error-ch channel"
     [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch parallel-counts]}]
     (info "close !!!!!!!!!! " @file-map-ref)
+
+    ;wait if the file map is empty
+    ;some files might still be in the event loops
+    (if (empty? @file-map-ref)
+      (Thread/sleep 1000))
+
+    (info "close !!!!  " @file-map-ref)
     (doseq [[k file-data] @file-map-ref]
       (try
         (do
@@ -211,13 +220,13 @@
 			            (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
 			      ((:send star) file-key
 			                    #(roll-and-notify parallel-counts file-map-ref roll-ch %) (force file-data))))
-      (catch Exception e (error e e))))
+      (catch Exception e (prn e e))))
 
   (defn check-roll [{:keys [star file-map-ref] :as conn}]
     (try
       (doseq [[k file-data] @file-map-ref]
           (check-file-data-roll conn (force file-data)))
-      (catch Exception e (error e e))))
+      (catch Exception e (prn e e))))
 
   (defn ape
     "Entrypoint to the api, creates the resources for writing"
@@ -251,7 +260,7 @@
 		                  (doseq [f roll-callbacks]
 		                    (f v))
 
-		                (catch Exception e (error e e)))
+		                (catch Exception e (prn e e)))
                   (recur))))))
 
 	       (assoc conn :fix-delay-ch (fixdelay (:check-freq conn)
