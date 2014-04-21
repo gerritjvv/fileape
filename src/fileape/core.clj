@@ -60,10 +60,9 @@
     "Create the filename that would be written once the file has been rolled"
     [f i]
     (let [^File file (clojure.java.io/file f)]
-      (.getParent file
-                  ^String (add-file-name-index
-                           (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
-                           i))))
+      (str
+       (.getParent file) "/" (add-file-name-index
+                              (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))) i))))
 
   (defn create-file-data
     "Create a file and return a map with keys file codec file-key out,
