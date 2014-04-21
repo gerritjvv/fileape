@@ -39,7 +39,7 @@ For the function sent to the write function, before version 0.5.0 the argument w
 ; file ^java.io.File the file name that is being written
 ; codec ^clojure.lang.Keyword
 ; file-key the key used to write the data
-
+; record-counter java.util.concurrent.atomic.AtomicLong (a helper function is provided see record-count)
 (close ape2)
 
 ```

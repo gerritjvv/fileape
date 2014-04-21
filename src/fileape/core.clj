@@ -8,7 +8,7 @@
          [clojure.string :as clj-str]
          [clojure.tools.logging :refer [info error]])
 
-  (import [java.util.concurrent.atomic AtomicReference AtomicInteger]
+  (import [java.util.concurrent.atomic AtomicReference AtomicInteger AtomicLong]
           [org.xerial.snappy SnappyOutputStream]
           [java.util.zip GZIPOutputStream]
           [java.io File BufferedOutputStream DataOutputStream FileOutputStream OutputStream]))
@@ -60,6 +60,12 @@
        (.getParent file) "/" (add-file-name-index
                               (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))) i))))
 
+  (defn ^Long record-count
+    "Helper function for the file data to retreive the record count without needing to do type hinting to AtomicLong"
+    [{:keys [^AtomicLong record-counter]}]
+    (.get record-counter))
+
+
   (defn create-file-data
     "Create a file and return a map with keys file codec file-key out,
      out contains the output stream and will always be a DataOutputStream
@@ -73,6 +79,7 @@
       (if (not (.exists file)) (throw (java.io.IOException. (str "Failed to create " file)))  )
 
       (merge {:file file :codec codec :file-key file-key :future-file-name (create-future-file-name file 0)
+              :record-counter (AtomicLong. 0)
               :updated (AtomicReference. (System/currentTimeMillis))}
              (get-output file conf))))
 
@@ -100,6 +107,7 @@
                             (.printStackTrace e)
                             (error e e)
                             (>!! error-ch e))))
+     (.incrementAndGet ^AtomicLong (:record-counter file-data))
      (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
 
   (defn- get-parallel-counter [parallel-counts file-key]
