@@ -1,6 +1,6 @@
 # fileape
 
-Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip 
+Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip
 
 This allows the user to write data and have the api take care of splitting to data into files based on keys e.g. topic-datetime, and rollover the data
 on a timeout or size.
@@ -11,9 +11,7 @@ on a timeout or size.
 
 ### Version compatibility
 
-For the function sent to the write function, before version 0.5.0 the argument was a single ```^DataOutputStream out```
-
-From 0.5.0 and forward a map is passed to the function with the keys: out, future-file-name, file, codec, file-key. 
+For the function sent to the write function, before version 0.5.0 the argument was a single ^DataOutputStream out. From 0.5.0 and forward a map is passed to the function with the keys: out, future-file-name, file, codec, file-key.
 
 
 ```clojure
@@ -26,24 +24,24 @@ From 0.5.0 and forward a map is passed to the function with the keys: out, futur
    (prn "File rolled " file))
 
 (def ape2 (ape {:codec :gzip
-		:base-dir "testdir" 
+		:base-dir "testdir"
                 :check-freq 5000
                 :rollover-size 134217728
                 :rollover-timeout 60000
                 :roll-callbacks [callback-f]}))
 
-(write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] 
-                                                 (.writeInt o (int 1))))
+(write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}]
+                                                 (.writeInt out (int 1))))
 
 ;keys sent to the file write function above are
 ; out ^java.io.DataOutputStream
 ; future-file-name ^String the file name after rolling
 ; file ^java.io.File the file name that is being written
-; codec ^clojure.lang.Keyword 
+; codec ^clojure.lang.Keyword
 ; file-key the key used to write the data
 
 (close ape2)
-               
+
 ```
 
 
@@ -61,11 +59,11 @@ import fileape.FileApeConnector.Writer;
 
 public class Test {
 
-	
+
 	public static final void main(String[] args){
-		
+
 		final Map<String, Object> conf = new HashMap<String, Object>();
-		
+
 		conf.put("base-dir", "/tmp/test");
 		conf.put("codec", "gzip");
 		conf.put("check-freq", 5000);
@@ -80,12 +78,12 @@ public class Test {
 				System.out.println("File rolled: " + fileData.get(Keyword.find("file")));
 				return null;
 			}
-			
+
 		});
-		
+
 		//create the connector
 		final Object connector = FileApeConnector.create(conf);
-		
+
 		//using a string
 		FileApeConnector.write(connector, "test", "Hi\n");
 		//using bytes
@@ -97,17 +95,17 @@ public class Test {
 			public void write(DataOutputStream out) throws Exception {
 				out.writeChars("Hi\n");
 			}
-			
+
 		});
-		
+
 		FileApeConnector.close(connector);
-		
+
 	}
-	
+
 
 ```
 
-## LZO 
+## LZO
 
 LZO is distributed under the GPL 3 license and therefore fileape needs to come in two versions fileape (apache2) and fileape-lzo (gpl).
 
@@ -126,19 +124,19 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
    (prn "File rolled " file))
 
 (def ape2 (ape {:codec :lzo
-		:base-dir "testdir" 
+		:base-dir "testdir"
                 :check-freq 5000
                 :rollover-size 134217728
                 :rollover-timeout 60000
                 :roll-callbacks [callback-f]}))
 
-(write ape2 "abc-123" (fn [^DataOutputStream o] 
+(write ape2 "abc-123" (fn [^DataOutputStream o]
                                                  (.writeInt o (int 1))))
 
 
 (close ape2)
-               
-``` 
+
+```
 
 ## License
 

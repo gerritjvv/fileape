@@ -24,8 +24,8 @@
 
              (let [write-count (AtomicInteger.)
                    ape (ape {:codec :gzip})]
-               (write ape "abc-123" (fn [^DataOutputStream o] (.getAndIncrement write-count)
-                                                 (.writeInt o (int 1))))
+               (write ape "abc-123" (fn [{:keys [^DataOutputStream out]}] (.getAndIncrement write-count)
+                                                 (.writeInt out (int 1))))
 
                (Thread/sleep 500)
                (.get write-count) => 1
@@ -38,7 +38,7 @@
 
                  (doseq [i (range 100)]
                    (let [ bts (.getBytes (str i "\n")) ]
-                   (write ape2 "abc-123" (fn [^DataOutputStream o] (.writeInt o (int i))))))
+                   (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.writeInt out (int i))))))
 
                  (Thread/sleep 2000)
                  (close ape2)
@@ -63,7 +63,7 @@
                    ;write out 1gig of raw data
 
 	                 (doseq [^bytes mb-bts (take 1000 (repeatedly (fn [] bts-1mb)))]
-	                   (write ape2 "abc-123" (fn [^DataOutputStream o] (.write o mb-bts 0 (int bts-len)  ))))
+	                   (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.write out mb-bts 0 (int bts-len)  ))))
 
                    (let [end (System/currentTimeMillis)]
                      (close ape2)
@@ -78,7 +78,7 @@
 		                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 200})
 	                       start (System/currentTimeMillis)]
 
-	                   (write ape2 "abc-123" (fn [^DataOutputStream o] (.writeInt o (int 1))))
+	                   (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.writeInt out (int 1))))
 	                   (Thread/sleep 2000)
 	                   ;we expect a file here
 	                   (let [file (first (filter (fn [^File file] (re-find #"abc-123" (.getName file))) (.listFiles base-dir)))]
@@ -99,7 +99,7 @@
 
 
 	                    (doseq [^bytes mb-bts (take 1000 (repeatedly (fn [] bts-1mb)))]
-                        (write ape2 "abc-123" (fn [^DataOutputStream o] (.write o mb-bts 0 (int bts-len)  ))))
+                        (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.write out mb-bts 0 (int bts-len)  ))))
 
 	                   ;we expect a file here
 	                   (let [files (filter (fn [^File file] (re-find #"abc-123" (.getName file))) (.listFiles base-dir))]
