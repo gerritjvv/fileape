@@ -7,12 +7,20 @@ on a timeout or size.
 
 ## Usage
 
-```[fileape "0.4.4-SNAPSHOT"]```
+```[fileape "0.5.0-SNAPSHOT"]```
+
+### Version compatibility
+
+For the function sent to the write function, before version 0.5.0 the argument was a single ```^DataOutputStream out```
+
+From 0.5.0 and forward a map is passed to the function with the keys: out, future-file-name, file, codec, file-key. 
+
 
 ```clojure
 
 (require '[fileape.core :refer :all])
 (import '[java.io File DataOutputStream])
+
 
 (defn callback-f [{:keys [file]}]
    (prn "File rolled " file))
@@ -24,9 +32,15 @@ on a timeout or size.
                 :rollover-timeout 60000
                 :roll-callbacks [callback-f]}))
 
-(write ape2 "abc-123" (fn [^DataOutputStream o] 
+(write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] 
                                                  (.writeInt o (int 1))))
 
+;keys sent to the file write function above are
+; out ^java.io.DataOutputStream
+; future-file-name ^String the file name after rolling
+; file ^java.io.File the file name that is being written
+; codec ^clojure.lang.Keyword 
+; file-key the key used to write the data
 
 (close ape2)
                

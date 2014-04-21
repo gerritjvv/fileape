@@ -15,9 +15,9 @@ import clojure.lang.RT;
 import clojure.lang.Symbol;
 
 /**
- * 
+ *
  * FileApe java interface.
- * 
+ *
  */
 public class FileApeConnector {
 
@@ -26,7 +26,7 @@ public class FileApeConnector {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param conf
 	 * @return
 	 */
@@ -41,12 +41,12 @@ public class FileApeConnector {
 			}else if (entry.getKey().equals("roll-callbacks")) {
 				propvals.add(Keyword.find("roll-callbacks"));
 				Object val = entry.getValue();
-				
+
 				if(val instanceof Collection)
 					propvals.add(val);
 				else
 					propvals.add(PersistentVector.create(val));
-				
+
 			}else {
 				propvals.add(Keyword.find(entry.getKey()));
 				propvals.add(entry.getValue());
@@ -58,7 +58,7 @@ public class FileApeConnector {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param connector
 	 * @param key
 	 *            Write to the file <key>-date
@@ -93,7 +93,7 @@ public class FileApeConnector {
 
 	/**
 	 * Closes the connectors
-	 * 
+	 *
 	 * @param connector
 	 */
 	public static final void close(Object connector) {
@@ -101,19 +101,32 @@ public class FileApeConnector {
 	}
 
 	/**
-	 * 
+	 *
 	 * Helper for writing
-	 * 
+	 *
 	 */
 	public static abstract class Writer extends AFn {
 
-		public abstract void write(DataOutputStream out) throws Exception;
+    /**
+    *
+    * The keys to the map are: out
+    * out ^java.io.DataOutputStream
+    * future-file-name ^String the file name after rolling
+    * file ^java.io.File the file name that is being written
+    * codec ^clojure.lang.Keyword
+    * file-key the key used to write the data
+    */
+		public void write_data(clojure.lang.IPersistentMap map) throws Exception{
+        write((DataOutputStream)map.valAt(Keyword.find("out")));
+    }
+
+    public abstract void write(DataOutputStream out) throws Exception;
 
 		@Override
 		public Object invoke(Object arg) {
 
 			try {
-				write((DataOutputStream) arg);
+				write_data((clojure.lang.IPersistentMap) arg);
 			} catch (Exception e) {
 				RuntimeException rte = new RuntimeException(e);
 				rte.setStackTrace(e.getStackTrace());
