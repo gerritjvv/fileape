@@ -54,9 +54,11 @@
                             "_" (System/nanoTime))))
 
 
+  (declare add-file-name-index)
+
   (defn- create-future-file-name
     "Create the filename that would be written once the file has been rolled"
-    [file]
+    [file i]
     (.getParent ^File (clojure.java.io/file file))
                        ^String (add-file-name-index
                          (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last)))
@@ -74,7 +76,7 @@
       (info "create new file " (.getAbsolutePath file))
       (if (not (.exists file)) (throw (java.io.IOException. (str "Failed to create " file)))  )
 
-      (merge {:file file :codec codec :file-key file-key :future-file-name (create-future-file-name file)
+      (merge {:file file :codec codec :file-key file-key :future-file-name (create-future-file-name file 0)
               :updated (AtomicReference. (System/currentTimeMillis))}
              (get-output file conf))))
 
@@ -159,7 +161,7 @@
       (catch Exception e (error e e)))
     (let [file2 (File. future-file-name)]
       (if (.exists file2)
-        (close-and-roll file-data (inc i))
+        (close-and-roll (assoc file-data :future-file-name (create-future-file-name file i)) (inc i))
         (do
           (info "Rename " (.getName file) " to " (.getName file2))
           (.renameTo file file2)
