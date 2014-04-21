@@ -60,7 +60,7 @@
        (.getParent file) "/" (add-file-name-index
                               (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))) i))))
 
-  (defn ^Long record-count
+  (defn ^long record-count
     "Helper function for the file data to retreive the record count without needing to do type hinting to AtomicLong"
     [{:keys [^AtomicLong record-counter]}]
     (.get record-counter))
