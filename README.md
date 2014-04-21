@@ -91,6 +91,8 @@ public class Test {
 		//using a callback function
 		FileApeConnector.write(connector, "test", new Writer(){
 
+      //to get the file data map use the write_data method
+
 			@Override
 			public void write(DataOutputStream out) throws Exception {
 				out.writeChars("Hi\n");
