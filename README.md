@@ -7,7 +7,12 @@ on a timeout or size.
 
 ## Usage
 
-```[fileape "0.5.0-SNAPSHOT"]```
+[![Clojars Project](http://clojars.org/fileape/latest-version.svg)](http://clojars.org/fileape)
+
+
+### Java Version
+
+Depends on java 1.7
 
 ### Version compatibility
 

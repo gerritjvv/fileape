@@ -1,4 +1,4 @@
-(defproject fileape "0.5.0-SNAPSHOT"
+(defproject fileape "0.6.0"
   :description "Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip"
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
