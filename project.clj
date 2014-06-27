@@ -3,7 +3,6 @@
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :javac-options ["-target" "1.6" "-source" "1.6" "-Xlint:-options"]
   :plugins [
          [lein-rpm "0.0.5"] [lein-midje "3.0.1"] [lein-marginalia "0.7.1"] 
          [lein-kibit "0.0.8"] [no-man-is-an-island/lein-eclipse "2.0.0"]]
@@ -11,7 +10,7 @@
                 *assert* false}
 
   :jvm-opts ["-Djava.library.path=/opt/hadoopgpl/native/Linux-amd64-64/"]
-  :javac-options ["-target" "1.5" "-source" "1.5" "-Xlint:-options"] 
+  :javac-options ["-target" "1.7" "-source" "1.7" "-Xlint:-options"] 
   :java-source-paths ["java"]
   :dependencies [
                   [org.apache.hadoop/hadoop-common "2.2.0" :scope "provided"]
