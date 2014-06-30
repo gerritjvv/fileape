@@ -1,6 +1,6 @@
 (ns fileape.core
   (require
-    [clojure.java.io :refer [make-parents]]
+    [clojure.java.io :refer [make-parents] :as io]
     [fileape.native-gzip :refer [create-native-gzip]]
     [fileape.bzip2 :refer [create-bzip2]]
     [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
@@ -23,14 +23,12 @@
                                "."
                                (last s1)]))))
 
-(defn- create-future-file-name
+(defn create-future-file-name
   "Create the filename that would be written once the file has been rolled"
   [f i]
-  (let [^File file (clojure.java.io/file f)]
+  (let [^File file (io/file f)]
     (str
-      (.getParent file) "/" (add-file-name-index
-                              (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))) i))
-    file))
+      (.getParent file) "/" (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))))))
 
 (defn th-rand-int
   "Returns a random number using the ThreadLocalRandom class from java 1.7"
@@ -67,7 +65,7 @@
 
 (defn ^File create-file [base-dir codec file-key]
   "Create and return a File object with the name based on the file key codec and base dir"
-  (File. (clojure.java.io/file base-dir)
+  (File. (io/file base-dir)
          (str file-key
               (codec-extension codec)
               "_" (System/nanoTime))))
@@ -83,13 +81,14 @@
       (make-parents file)
       (.createNewFile file)
       (info "create new file " (.getAbsolutePath file))
-      (if (not (.exists file)) (throw (IOException. (str "Failed to create " file))))
+      (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
       (assoc
         (get-output file conf)
         :file  file
         :codec codec
         :file-key file-key
+        :future-file-name (io/file (create-future-file-name file 0))
         :record-counter (AtomicLong. 0)
         :updated        (AtomicReference. (System/currentTimeMillis))))))
 
@@ -133,19 +132,17 @@
 
 (defn close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
-  [{:keys [^File file ^OutputStream out] :as file-data} i]
+  [{:keys [^File file ^OutputStream out ^File future-file-name] :as file-data} i]
   (io!
-    (try
-      (do
-        (info "close and roll " file)
-        (doto out .flush .close))
-      (catch Exception e (prn e e)))
-    (let [^File file2 (create-future-file-name file i)]
-      (do
-        (info "Rename " (.getName file) " to " (.getName file2))
-        (.renameTo file file2)
-        file2
-        ))))
+
+    (doto out .flush .close)
+    (let [^File file2 (if-not (.exists future-file-name)
+                        future-file-name
+                        (io/file (create-future-file-name future-file-name 1)))]
+      (info "close and roll " file " to " file2)
+      (.renameTo file file2)
+      file2
+      )))
 
 (defn roll-and-notify
   "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
