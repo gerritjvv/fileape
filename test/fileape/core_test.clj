@@ -20,7 +20,7 @@
 
 (facts "Test file writing"
        (fact "Test future file name rollover"
-             (create-future-file-name "blabla_abc.gz_000" 0) => "/blabla_abc.gz")
+             (create-future-file-name "blabla_abc.gz_000" 0) => "/blabla_abc.000.gz")
 
        (fact "test write file"
 
