@@ -26,9 +26,13 @@
 (defn create-future-file-name
   "Create the filename that would be written once the file has been rolled"
   [f i]
-  (let [^File file (io/file f)]
+  (let [^File file (io/file f)
+        sp (-> (.getName file) (clj-str/split #"_"))
+        n (clj-str/join "" (interpose "_" (drop-last sp)))  ;get name without
+        sp2 (clj-str/split n #"\.")
+        ]
     (str
-      (.getParent file) "/" (clj-str/join "" (interpose "_" (-> (.getName file) (clj-str/split #"_") drop-last))))))
+      (.getParent file) "/" (clj-str/join "." (conj (vec (drop-last sp2)) (last sp) (last sp2))))))
 
 (defn th-rand-int
   "Returns a random number using the ThreadLocalRandom class from java 1.7"
@@ -138,7 +142,7 @@
     (doto out .flush .close)
     (let [^File file2 (if-not (.exists future-file-name)
                         future-file-name
-                        (io/file (create-future-file-name future-file-name 1)))]
+                        (io/file (create-future-file-name file 1)))]
       (info "close and roll " file " to " file2)
       (.renameTo file file2)
       file2
