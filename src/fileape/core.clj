@@ -1,9 +1,10 @@
+;;see https://github.com/gerritjvv/fileape for usage
 (ns fileape.core
   (require
     [clojure.java.io :refer [make-parents] :as io]
     [fileape.native-gzip :refer [create-native-gzip]]
     [fileape.bzip2 :refer [create-bzip2]]
-    [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay]]
+    [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay go-seq]]
     [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer]]
     [clojure.string :as clj-str]
     [clojure.tools.logging :refer [info error]])
@@ -49,26 +50,28 @@
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 
-(defn ^OutputStream get-output [^File file {:keys [codec] :or {codec :gzip}}]
+(defn ^OutputStream get-output
   "Takes a file path and creates, creates an output stream using the correct codec
    and then returns it. possible values for the codec are :gzip :snappy :none"
+  [^File file {:keys [codec] :or {codec :gzip}}]
   (cond
     (= codec :gzip)
-    (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))]
+    (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 2 1048576)))))]
       {:out zipout})
     (= codec :native-gzip)
     {:out (create-native-gzip file)}
     (= codec :bzip2)
     {:out (create-bzip2 file)}
     (= codec :snappy)
-    {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))}
+    {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 2 1048576)))))}
     (= codec :none)
     {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 
-(defn ^File create-file [base-dir codec file-key]
+(defn ^File create-file
   "Create and return a File object with the name based on the file key codec and base dir"
+  [base-dir codec file-key]
   (File. (io/file base-dir)
          (str file-key
               (codec-extension codec)
@@ -88,13 +91,13 @@
       (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
       (assoc
-        (get-output file conf)
-        :file  file
+          (get-output file conf)
+        :file file
         :codec codec
         :file-key file-key
         :future-file-name (io/file (create-future-file-name file 0))
         :record-counter (AtomicLong. 0)
-        :updated        (AtomicReference. (System/currentTimeMillis))))))
+        :updated (AtomicReference. (System/currentTimeMillis))))))
 
 (defn- get-file-data!
   "Should always be called synchronized on file-key"
@@ -131,8 +134,7 @@
     ((:send star) k
      ;this function will run in a channel in sync with other instances of the same topic
      #(write-to-file-data (get-file-data! conn k) error-ch %)
-     writer-f
-     )))
+     writer-f)))
 
 (defn close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
@@ -175,7 +177,7 @@
         (do
           ;we send close on the channel star, to coordinate close and writes
           (stop-fixdelay fix-delay-ch)
-          ((:send star) true                                  ;;wait for response
+          ((:send star) true                                ;;wait for response
            (:file-key file-data)
            [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data))
         (catch Exception e (do (prn e e) (>!! error-ch e))))))
@@ -188,20 +190,18 @@
    {:keys [file-key ^File file updated out] :as file-data}]
   (try
     (do
-      ;(.flush out)
-      ;(info "Check rollover-size[ " rollover-size "] < " (.getName file) " length " (.length file) " ts " (.get ^AtomicReference updated))
-      (if (or (>= (.length file) rollover-size)
-              (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
-        ((:send star)
-         file-key
-         #(roll-and-notify file-map-ref roll-ch %) file-data)))
+      (when (or (>= (.length file) rollover-size)
+                (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
+        ;we need to remove the file key waiting for the remove to complete
+        ((:send star) false                                 ;; do not wait for response
+         (:file-key file-data)
+         [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data)))
     (catch Exception e (error e e))))
 
 (defn check-roll [{:keys [star file-map-ref] :as conn}]
   (try
-    (doseq [[k file-data] @file-map-ref]
-      (check-file-data-roll conn file-data))
-    (catch Exception e (prn e e))))
+    (->> file-map-ref deref vals (map #(check-file-data-roll conn %)) doall)
+    (catch Exception e (error e e))))
 
 (defn ape
   "Entrypoint to the api, creates the resources for writing"
@@ -225,17 +225,12 @@
 
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
     ;if any rollbacks
-    (if roll-callbacks
-      (go
-        (loop []
-          (if-let [v (<! roll-ch)]
-            (do
-              (try
-                (doseq [f roll-callbacks]
-                  (f v))
+    (when (not-empty roll-callbacks)
+      (go-seq
+        (fn [v]
+          (try
+            (->> roll-callbacks (map #(% v)) doall)
+            (catch Exception e (prn e e))))
+        roll-ch))
 
-                (catch Exception e (prn e e)))
-              (recur))))))
-
-    (assoc conn :fix-delay-ch (fixdelay (:check-freq conn)
-                                        (check-roll conn)))))
+    (assoc conn :fix-delay-ch (fixdelay (:check-freq conn) (check-roll conn)))))
