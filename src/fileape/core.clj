@@ -56,14 +56,14 @@
   [^File file {:keys [codec] :or {codec :gzip}}]
   (cond
     (= codec :gzip)
-    (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 2 1048576)))))]
+    (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))]
       {:out zipout})
     (= codec :native-gzip)
     {:out (create-native-gzip file)}
     (= codec :bzip2)
     {:out (create-bzip2 file)}
     (= codec :snappy)
-    {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 2 1048576)))))}
+    {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))}
     (= codec :none)
     {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
     :else
