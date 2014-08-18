@@ -69,10 +69,15 @@
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 
+(defn- select-base-dir [base-dir]
+  (if (coll? base-dir)
+    (rand-nth base-dir)
+    base-dir))
+
 (defn ^File create-file
   "Create and return a File object with the name based on the file key codec and base dir"
   [base-dir codec file-key]
-  (File. (io/file base-dir)
+  (File. (io/file (select-base-dir base-dir))
          (str file-key
               (codec-extension codec)
               "_" (System/nanoTime))))
@@ -186,12 +191,13 @@
 
 (defn check-file-data-roll
   "Checks and if the file should be rolled its rolled"
-  [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout]}
+  [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout rollover-abs-timeout]}
    {:keys [file-key ^File file updated out] :as file-data}]
   (try
-    (do
+    (let [tm-diff (- (System/currentTimeMillis) (.get ^AtomicReference updated))]
       (when (or (>= (.length file) rollover-size)
-                (>= (- (System/currentTimeMillis) (.get ^AtomicReference updated)) rollover-timeout))
+                (>= tm-diff rollover-timeout)
+                (>= tm-diff rollover-abs-timeout))
         ;we need to remove the file key waiting for the remove to complete
         ((:send star) false                                 ;; do not wait for response
          (:file-key file-data)
@@ -205,8 +211,8 @@
 
 (defn ape
   "Entrypoint to the api, creates the resources for writing"
-  [{:keys [codec base-dir rollover-size rollover-timeout check-freq roll-callbacks
-           parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3}}]
+  [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks
+           parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3 rollover-abs-timeout Long/MAX_VALUE}}]
   (let [error-ch (chan (sliding-buffer 10))
         roll-ch (chan (sliding-buffer 100))
         file-map-ref (ref {})
@@ -221,6 +227,7 @@
          :check-freq       check-freq
          :error-ch         error-ch
          :parallel-files   parallel-files
+         :rollover-abs-timeout rollover-abs-timeout
          :roll-ch          roll-ch}]
 
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)

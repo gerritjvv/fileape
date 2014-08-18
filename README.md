@@ -145,8 +145,22 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 
 ```
 
-## License
+## Properties
 
+<table border="0">
+<tr><td><b>Name</b></td><td><b>Description</b></td></tr>
+<tr><td>:codec</td><td>the code to use :gzip, :gzip-native, :snappy, :bzip2, :none</td></tr>
+<tr><td>:base-dir</td><td>the base directory or directories to use, if a list is specified a directory will be randomly selected on file create</td></tr>
+<tr><td>:rollover-size</td><td>size in bytes on which the file is rolled</td></tr>
+<tr><td>:rollover-timeout</td><td>if no bytes where written for this period of time in milliseconds to the file its rolled</td></tr>
+<tr><td>:check-freq</td><td>frequency in milliseconds in which the open files are checked</td></tr>
+<tr><td>:parallel-files</td><td>this is a performance property, for each topic n=parallel-files files will be created.</td></tr>
+<tr><td>:rollover-abs-timeout</td><td>A file is only open rollover-abs-timeout milliseconds, default is Long/MAX_VALUE</td></tr>
+</table>
+
+
+
+## License
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
