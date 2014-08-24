@@ -1,15 +1,18 @@
 ;;see https://github.com/gerritjvv/fileape for usage
 (ns fileape.core
+  (:import (fileape.io ActorPool$Command)
+           (clojure.lang IFn))
   (require
     [clojure.java.io :refer [make-parents] :as io]
     [fileape.native-gzip :refer [create-native-gzip]]
     [fileape.bzip2 :refer [create-bzip2]]
-    [fun-utils.core :refer [star-channel apply-get-create fixdelay stop-fixdelay go-seq]]
+    [fun-utils.core :refer [apply-get-create fixdelay stop-fixdelay go-seq]]
     [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer]]
     [clojure.string :as clj-str]
     [clojure.tools.logging :refer [info error]])
 
-  (import [java.util.concurrent.atomic AtomicReference AtomicInteger AtomicLong]
+  (import [fileape.io Actor ActorPool]
+          [java.util.concurrent.atomic AtomicReference AtomicInteger AtomicLong]
           [java.util.concurrent ThreadLocalRandom]
           [org.xerial.snappy SnappyOutputStream]
           [java.util.zip GZIPOutputStream]
@@ -104,15 +107,6 @@
         :record-counter (AtomicLong. 0)
         :updated (AtomicReference. (System/currentTimeMillis))))))
 
-(defn- get-file-data!
-  "Should always be called synchronized on file-key"
-  [{:keys [file-map-ref] :as conf} file-key]
-  (if-let [file-data (get @file-map-ref file-key)]
-    file-data
-    (let [file-data (create-file-data! conf file-key)]
-      (dosync
-        (alter file-map-ref assoc file-key file-data))
-      file-data)))
 
 (defn- write-to-file-data
   "Calls writer-f with the file-data"
@@ -120,11 +114,13 @@
   (try
     (writer-f file-data)
     (catch Exception e (do
+                         (error file-data)
                          (.printStackTrace e)
                          (error e e)
                          (>!! error-ch e))))
   (.incrementAndGet ^AtomicLong (:record-counter file-data))
-  (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis)))
+  (.set ^AtomicReference (:updated file-data) (System/currentTimeMillis))
+  file-data)
 
 (defn- create-parallel-key
   "Create a key name that is based on file-key + rand[0 - parallel-files]"
@@ -134,12 +130,18 @@
 (defn write
   "Writes the data in a thread safe manner to the file output stream based on the file-key
    If no output stream exists one is created"
-  [{:keys [star error-ch] :as conn} file-key writer-f]
-  (let [k (create-parallel-key conn file-key)]
-    ((:send star) k
-     ;this function will run in a channel in sync with other instances of the same topic
-     #(write-to-file-data (get-file-data! conn k) error-ch %)
-     writer-f)))
+  [{:keys [^ActorPool actor-pool error-ch ^IFn file-data-create] :as conn} file-key writer-f]
+  (let [^String k (create-parallel-key conn file-key)
+        ^IFn f (fn [file-data]
+                 (try
+                   (write-to-file-data file-data error-ch writer-f)
+                   (catch Exception e (error (str "Error file-data " file-data)))
+                   (finally file-data)))]
+    (.send                                                  ;IFn createStateFn, String key, IFn fn
+     actor-pool
+     file-data-create
+     k
+     f)))
 
 (defn close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
@@ -157,41 +159,29 @@
 
 (defn roll-and-notify
   "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
-  [file-map-ref roll-ch file-data]
-  (dosync
-    (alter file-map-ref dissoc (:file-key file-data)))
+  [roll-ch file-data]
+
   (prn ">>>>>>> close-and-roll " file-data)
   (let [file (close-and-roll file-data 0)]
-    (>!! roll-ch (assoc file-data :file file))))
+    (>!! roll-ch (assoc file-data :file file))
+    file-data))
 
 (defn close
   "Close each open file, and notify a roll event to the roll-ch channel
    any errors are reported to the error-ch channel"
-  [{:keys [star file-map-ref error-ch roll-ch fix-delay-ch]}]
-  (info "close !!!!!!!!!! " @file-map-ref)
+  [{:keys [^ActorPool actor-pool  error-ch roll-ch fix-delay-ch file-data-create]}]
 
-  ;wait if the file map is empty
-  ;some files might still be in the event loops
-  (if (empty? @file-map-ref)
-    (Thread/sleep 1000))
-
-  (info "close !!!!  " @file-map-ref)
-  (while (not-empty @file-map-ref)
-    (doseq [[k file-data] @file-map-ref]
-      (try
-        (do
-          ;we send close on the channel star, to coordinate close and writes
-          (stop-fixdelay fix-delay-ch)
-          ((:send star) true                                ;;wait for response
-           (:file-key file-data)
-           [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data))
-        (catch Exception e (do (prn e e) (>!! error-ch e))))))
-
-  ((:close star)))
+  (stop-fixdelay fix-delay-ch)
+  (.sendCommandAll
+    actor-pool
+    ActorPool$Command/DELETE
+    file-data-create
+    #(roll-and-notify roll-ch %))
+  (.shutdown actor-pool 5000))
 
 (defn check-file-data-roll
   "Checks and if the file should be rolled its rolled"
-  [{:keys [star file-map-ref roll-ch rollover-size rollover-timeout rollover-abs-timeout]}
+  [{:keys [^ActorPool actor-pool roll-ch rollover-size rollover-timeout rollover-abs-timeout file-data-create]}
    {:keys [file-key ^File file updated out] :as file-data}]
   (try
     (let [tm-diff (- (System/currentTimeMillis) (.get ^AtomicReference updated))]
@@ -199,14 +189,22 @@
                 (>= tm-diff rollover-timeout)
                 (>= tm-diff rollover-abs-timeout))
         ;we need to remove the file key waiting for the remove to complete
-        ((:send star) false                                 ;; do not wait for response
+        (.sendCommand
+         actor-pool
+         ActorPool$Command/DELETE
+         file-data-create
          (:file-key file-data)
-         [:remove #(roll-and-notify file-map-ref roll-ch %)] file-data)))
-    (catch Exception e (error e e))))
+         #(roll-and-notify roll-ch %))))
+    (catch Exception e (error e e))
+    (finally file-data)))
 
-(defn check-roll [{:keys [star file-map-ref] :as conn}]
+(defn check-roll [{:keys [^ActorPool actor-pool file-data-create] :as conn}]
   (try
-    (->> file-map-ref deref vals (map #(check-file-data-roll conn %)) doall)
+    (.sendCommandAll
+      actor-pool
+      nil
+      file-data-create
+      (partial check-file-data-roll conn))
     (catch Exception e (error e e))))
 
 (defn ape
@@ -215,13 +213,11 @@
            parallel-files] :or {check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3 rollover-abs-timeout Long/MAX_VALUE}}]
   (let [error-ch (chan (sliding-buffer 10))
         roll-ch (chan (sliding-buffer 100))
-        file-map-ref (ref {})
-        star (star-channel :wait-response false :buff 1000)
+        actor-pool (ActorPool/newInstance)
         conn
         {:codec            codec
-         :star             star
+         :actor-pool       actor-pool
          :base-dir         base-dir
-         :file-map-ref     file-map-ref
          :rollover-size    rollover-size
          :rollover-timeout rollover-timeout
          :check-freq       check-freq
@@ -240,4 +236,7 @@
             (catch Exception e (prn e e))))
         roll-ch))
 
-    (assoc conn :fix-delay-ch (fixdelay (:check-freq conn) (check-roll conn)))))
+    (assoc conn
+      :file-data-create (fn [k]
+                          (create-file-data! conn k))
+      :fix-delay-ch (fixdelay (:check-freq conn) (check-roll conn)))))

@@ -1,5 +1,4 @@
 (ns fileape.oom-fileroll-test
-  "Test that the filedata is removed when roll conditions are met"
   (:import [java.io File DataOutputStream])
   (:require [midje.sweet :refer :all]
             [fileape.core :refer :all]))
