@@ -123,19 +123,21 @@ public class ActorPool implements Runnable{
     }
 
     private final void processItem(QueuedItem item) throws InterruptedException {
-        Actor actor = actorMap.get(item.key);
-        if(actor == null){
-            actor = new Actor(item.createStateFn.invoke(item.key), 1000);
-            actorMap.put(item.key, actor);
-            service.submit(actor);
-        }
+        if(item != null){
+            Actor actor = actorMap.get(item.key);
+            if(actor == null){
+                actor = new Actor(item.createStateFn.invoke(item.key), 1000);
+                actorMap.put(item.key, actor);
+                service.submit(actor);
+            }
 
-        actor.send(item.val);
+            actor.send(item.val);
 
-        if(item.cmd != null && item.cmd == Command.DELETE){
-            Actor removedActor = actorMap.remove(item.key);
-            if(removedActor != null)
-                removedActor.shutdown();
+            if(item.cmd != null && item.cmd == Command.DELETE){
+                Actor removedActor = actorMap.remove(item.key);
+                if(removedActor != null)
+                    removedActor.shutdown();
+            }
         }
     }
 
