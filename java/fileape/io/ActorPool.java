@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class ActorPool implements Runnable{
 
+    private static final String EMPTY_KEY = "NONE";
+
     private final ExecutorService service;
     private final ExecutorService masterService = Executors.newSingleThreadExecutor();
 
@@ -20,7 +22,7 @@ public class ActorPool implements Runnable{
 
     private AtomicBoolean shutdown = new AtomicBoolean(false);
 
-    public enum Command {DELETE}
+    public enum Command {DELETE, CHECK_ROLL}
 
     private final int actorBufferSize;
     private final int masterBufferSize;
@@ -51,8 +53,8 @@ public class ActorPool implements Runnable{
     }
 
     public void sendCommandAll(Command cmd, IFn createStateFn, final IFn fn){
-        try {
-            masterQueue.put(new SendAllQueuedItem(new QueuedItem(cmd, null, createStateFn, fn)));
+        try { // String key, IFn val, IFn createStateFn)
+            masterQueue.put(new SendAllQueuedItem(new QueuedItem(cmd, EMPTY_KEY, fn, createStateFn)));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return;
@@ -65,7 +67,7 @@ public class ActorPool implements Runnable{
         masterQueue.put(new QueuedItem(cmd, key, fn, createStateFn));
     }
 
-    public void send(IFn createStateFn, String key, IFn fn) throws InterruptedException {
+    public final void send(final IFn createStateFn, final String key, final IFn fn) throws InterruptedException {
         if(shutdown.get())
             throw new RuntimeException("ActorPool is shutdown");
 
@@ -118,7 +120,7 @@ public class ActorPool implements Runnable{
         else if(obj instanceof SendAllQueuedItem){
             QueuedItem item = ((SendAllQueuedItem)obj).item;
             for(Map.Entry<String, Actor> entry : actorMap.entrySet())
-                processItem(new QueuedItem(item.cmd, entry.getKey(), item.createStateFn, item.val));
+                processItem(new QueuedItem(item.cmd, entry.getKey(), item.val, item.createStateFn));
         }
     }
 
@@ -126,6 +128,10 @@ public class ActorPool implements Runnable{
         if(item != null){
             Actor actor = actorMap.get(item.key);
             if(actor == null){
+                //nothing to roll, exit
+                if(item.cmd != null && item.cmd == Command.CHECK_ROLL || item.cmd == Command.DELETE)
+                    return;
+
                 actor = new Actor(item.createStateFn.invoke(item.key), 1000);
                 actorMap.put(item.key, actor);
                 service.submit(actor);
@@ -155,6 +161,9 @@ public class ActorPool implements Runnable{
         final IFn createStateFn;
 
         public QueuedItem(Command cmd, String key, IFn val, IFn createStateFn){
+            if(createStateFn == null || key == null || val == null)
+                throw new NullPointerException("createStateFN[" + createStateFn + "], val[" + val + "], and key[" + key + "] cannot be null");
+
             this.cmd = cmd;
             this.key = key;
             this.val = val;

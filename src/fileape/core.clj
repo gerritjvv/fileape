@@ -6,7 +6,7 @@
     [clojure.java.io :refer [make-parents] :as io]
     [fileape.native-gzip :refer [create-native-gzip]]
     [fileape.bzip2 :refer [create-bzip2]]
-    [fun-utils.core :refer [apply-get-create fixdelay stop-fixdelay go-seq]]
+    [fun-utils.core :refer [apply-get-create fixdelay-thread stop-fixdelay go-seq]]
     [clojure.core.async :refer [go thread <! >! <!! >!! chan sliding-buffer]]
     [clojure.string :as clj-str]
     [clojure.tools.logging :refer [info error]])
@@ -146,25 +146,23 @@
 (defn close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
   [{:keys [^File file ^OutputStream out ^File future-file-name] :as file-data} i]
-  (io!
-
-    (doto out .flush .close)
-    (let [^File file2 (if-not (.exists future-file-name)
-                        future-file-name
-                        (io/file (create-future-file-name file 1)))]
-      (info "close and roll " file " to " file2)
-      (.renameTo file file2)
-      file2
-      )))
+  (when out
+    (io!
+      (doto out .flush .close)
+      (let [^File file2 (if-not (.exists future-file-name)
+                          future-file-name
+                          (io/file (create-future-file-name file 1)))]
+        (info "close and roll " file " to " file2)
+        (.renameTo file file2)
+        file2))))
 
 (defn roll-and-notify
   "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
   [roll-ch file-data]
-
-  (prn ">>>>>>> close-and-roll " file-data)
-  (let [file (close-and-roll file-data 0)]
-    (>!! roll-ch (assoc file-data :file file))
-    file-data))
+  (when file-data
+    (let [file (close-and-roll file-data 0)]
+      (>!! roll-ch (assoc file-data :file file))
+      file-data)))
 
 (defn close
   "Close each open file, and notify a roll event to the roll-ch channel
@@ -202,7 +200,7 @@
   (try
     (.sendCommandAll
       actor-pool
-      nil
+      ActorPool$Command/CHECK_ROLL
       file-data-create
       (partial check-file-data-roll conn))
     (catch Exception e (error e e))))
@@ -224,7 +222,8 @@
          :error-ch         error-ch
          :parallel-files   parallel-files
          :rollover-abs-timeout rollover-abs-timeout
-         :roll-ch          roll-ch}]
+         :roll-ch          roll-ch
+         :file-data-create (fn [& args])}]
 
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
     ;if any rollbacks
@@ -237,6 +236,6 @@
         roll-ch))
 
     (assoc conn
-      :file-data-create (fn [k]
-                          (create-file-data! conn k))
-      :fix-delay-ch (fixdelay (:check-freq conn) (check-roll conn)))))
+           :file-data-create (fn [k]
+                               (create-file-data! conn k))
+           :fix-delay-ch (fixdelay-thread (:check-freq conn) (check-roll conn)))))

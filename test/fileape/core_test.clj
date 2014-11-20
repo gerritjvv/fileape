@@ -30,13 +30,13 @@
                                       (.writeInt out (int 1))))
 
                (Thread/sleep 500)
-               (.get write-count) => 1
-
-               ))
+               (.get write-count) => 1))
 
          (fact "Write and read Gzip File"
                (let [base-dir (File. "target/tests/write-read-gzip1")
                      ape2 (ape {:codec :gzip :base-dir base-dir})]
+
+                 (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
 
                  (doseq [i (range 100)]
                    (let [ bts (.getBytes (str i "\n")) ]
@@ -51,9 +51,8 @@
                  (let [files (filter (fn [^File file] (re-find #"abc-123" (.getName file))) (.listFiles base-dir))]
                    (> (count files) 0) => true
                    (sort
-                     (take 100 (flatten (read-files files))))  => (range 100))
+                     (take 100 (flatten (read-files files))))  => (range 100))))
 
-                 ))
          (fact "Write speed test"
                (let [base-dir (File. "target/tests/write-speed-test")
                      ape2 (ape {:codec :gzip :base-dir base-dir})
@@ -61,6 +60,7 @@
                      bts-len (count bts-1mb)
                      start (System/currentTimeMillis)]
 
+                 (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
                  ;write out 1gig of raw data
 
                  (doseq [^bytes mb-bts (take 1000 (repeatedly (fn [] bts-1mb)))]
@@ -68,16 +68,14 @@
 
                  (let [end (System/currentTimeMillis)]
                    (close ape2)
-                   (prn "Time taken to write 1000 mb " (- end start) " ms"))
-
-
-
-                 ))
+                   (prn "Time taken to write 1000 mb " (- end start) " ms"))))
 
          (fact "Test Services rollover timeout"
                (let [base-dir (File. "target/tests/write-test-rollover-timeout")
                      ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 200})
                      start (System/currentTimeMillis)]
+
+                 (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
 
                  (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.writeInt out (int 1))))
                  (Thread/sleep 2000)
@@ -87,8 +85,7 @@
                    (nil? file) => false
                    (.exists file) => true)
 
-                 (close ape2)
-                 ))
+                 (close ape2)))
 
          (fact "Test Services rollover size"
                (let [base-dir (File. "target/tests/write-test-rollover-size")
@@ -98,6 +95,7 @@
 
                      start (System/currentTimeMillis)]
 
+                 (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
 
                  (doseq [^bytes mb-bts (take 1000 (repeatedly (fn [] bts-1mb)))]
                    (write ape2 "abc-123" (fn [{:keys [^DataOutputStream out]}] (.write out mb-bts 0 (int bts-len)  ))))
@@ -106,6 +104,4 @@
                  (let [files (filter (fn [^File file] (re-find #"abc-123" (.getName file))) (.listFiles base-dir))]
                    (prn "Files " (count files)))
 
-                 (close ape2)
-                 ))
-	          )
+                 (close ape2))))
