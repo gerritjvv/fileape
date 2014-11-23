@@ -7,13 +7,16 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import org.apache.log4j.Logger;
 /**
  */
 public class Actor implements Runnable{
 
+    private static final Logger LOG = Logger.getLogger(Actor.class);
+
     private final BlockingQueue<IFn> queue;
     private final AtomicBoolean shutdown = new AtomicBoolean(false);
+
 
     Object state;
 
@@ -23,6 +26,9 @@ public class Actor implements Runnable{
     }
 
     public void send(IFn fn) throws InterruptedException{
+        if(shutdown.get())
+            throw new IllegalStateException("actor is shutdown");
+
         queue.put(fn);
     }
 
@@ -43,7 +49,15 @@ public class Actor implements Runnable{
                 break;
             }catch(Throwable t){
                 t.printStackTrace();
+                LOG.error(t);
             }
+        }
+
+        //a grace period
+        try {
+            Thread.sleep(500);
+        }catch(InterruptedException e){
+
         }
 
         shutdown.set(true);
@@ -56,6 +70,7 @@ public class Actor implements Runnable{
                     return;
                 }
                 t.printStackTrace();
+                LOG.error(t);
             }
         }
 

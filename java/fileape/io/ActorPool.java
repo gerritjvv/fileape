@@ -5,6 +5,7 @@ import clojure.lang.IFn;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.log4j.Logger;
 
 /**
  * ActorPool creates and sends functions to Actor instances based on key values.<br/>
@@ -13,6 +14,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ActorPool implements Runnable{
 
     private static final String EMPTY_KEY = "NONE";
+
+    private static final Logger LOG = Logger.getLogger(ActorPool.class);
 
     private final ExecutorService service;
     private final ExecutorService masterService = Executors.newSingleThreadExecutor();
@@ -92,6 +95,7 @@ public class ActorPool implements Runnable{
                 break;
             }catch(Throwable t){
                 t.printStackTrace();
+                LOG.error(t);
             }
         }
 
@@ -102,6 +106,7 @@ public class ActorPool implements Runnable{
                 processQueuedItem(obj);
             }catch(Throwable t){
                 t.printStackTrace();
+                LOG.error(t);
             }
         }
 
@@ -119,9 +124,17 @@ public class ActorPool implements Runnable{
             processItem((QueuedItem)obj);
         else if(obj instanceof SendAllQueuedItem){
             QueuedItem item = ((SendAllQueuedItem)obj).item;
-            for(Map.Entry<String, Actor> entry : actorMap.entrySet())
+            for(Map.Entry<String, Actor> entry : actorMap.entrySet()) {
                 processItem(new QueuedItem(item.cmd, entry.getKey(), item.val, item.createStateFn));
+            }
         }
+    }
+
+    private final Actor createActor(QueuedItem item){
+        Actor actor = new Actor(item.createStateFn.invoke(item.key), 1000);
+        actorMap.put(item.key, actor);
+        service.submit(actor);
+        return actor;
     }
 
     private final void processItem(QueuedItem item) throws InterruptedException {
@@ -129,21 +142,25 @@ public class ActorPool implements Runnable{
             Actor actor = actorMap.get(item.key);
             if(actor == null){
                 //nothing to roll, exit
-                if(item.cmd != null && item.cmd == Command.CHECK_ROLL || item.cmd == Command.DELETE)
+                if(item.cmd != null && item.cmd == Command.CHECK_ROLL)
                     return;
-
-                actor = new Actor(item.createStateFn.invoke(item.key), 1000);
-                actorMap.put(item.key, actor);
-                service.submit(actor);
+                actor = createActor(item);
             }
-
-            actor.send(item.val);
+            try {
+                actor.send(item.val);
+            }catch(IllegalStateException e){
+                //create new actor
+                actor = createActor(item);
+                actor.send(item.val);
+            }
 
             if(item.cmd != null && item.cmd == Command.DELETE){
                 Actor removedActor = actorMap.remove(item.key);
                 if(removedActor != null)
                     removedActor.shutdown();
             }
+        }else{
+            LOG.error("Null item processed: " + item);
         }
     }
 

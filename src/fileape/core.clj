@@ -80,10 +80,16 @@
 (defn ^File create-file
   "Create and return a File object with the name based on the file key codec and base dir"
   [base-dir codec file-key]
-  (File. (io/file (select-base-dir base-dir))
-         (str file-key
-              (codec-extension codec)
-              "_" (System/nanoTime))))
+  (let [file (File. (io/file (select-base-dir base-dir))
+                    (str file-key
+                         (codec-extension codec)
+                         "_" (System/nanoTime)))]
+    ;check that the file does not exist
+    (if (.exists file)
+      (do
+        (Thread/sleep 200)
+        (create-file base-dir codec file-key))
+      file)))
 
 (defn- create-file-data!
   "Create a file and return a map with keys file codec file-key out,
@@ -187,6 +193,7 @@
                 (>= tm-diff rollover-timeout)
                 (>= tm-diff rollover-abs-timeout))
         ;we need to remove the file key waiting for the remove to complete
+
         (.sendCommand
          actor-pool
          ActorPool$Command/DELETE
