@@ -13,7 +13,7 @@
         :url "https://github.com/gerritjvv/fileape.git"}
 
   :jvm-opts ["-Djava.library.path=/opt/hadoopgpl/native/Linux-amd64-64/"]
-  :javac-options ["-target" "1.7" "-source" "1.7" "-Xlint:-options"]
+  :javac-options ["-target" "1.6" "-source" "1.6" "-Xlint:-options"]
   :java-source-paths ["java"]
   :dependencies [
                   ;[org.apache.hadoop/hadoop-common "2.2.0" :scope "provided"]
