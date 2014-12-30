@@ -1,12 +1,11 @@
 package fileape.io;
 
 import clojure.lang.IFn;
+import org.apache.log4j.Logger;
 
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.log4j.Logger;
 
 /**
  * ActorPool creates and sends functions to Actor instances based on key values.<br/>
@@ -74,7 +73,7 @@ public class ActorPool implements Runnable {
 
     private void _sendCommand(Object item) throws InterruptedException {
         if (!masterQueue.offer(item, 5, TimeUnit.SECONDS)) {
-            LOG.error("The ActorPool master queue (mail box) is ful, blocking till a slot becomes available: " + this);
+            LOG.error("The ActorPool master queue (mail box) is ful, blocking till a slot becomes available: " + this + " total actors: " + actorMap.size());
             masterQueue.put(item);
             LOG.error("Unblocked: " + this);
         }
@@ -210,5 +209,6 @@ public class ActorPool implements Runnable {
         public QueuedItem(String key, IFn val, IFn createStateFn) {
             this(null, key, val, createStateFn);
         }
+
     }
 }

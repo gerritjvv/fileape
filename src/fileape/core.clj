@@ -1,7 +1,8 @@
 ;;see https://github.com/gerritjvv/fileape for usage
 (ns fileape.core
   (:import (fileape.io ActorPool$Command)
-           (clojure.lang IFn))
+           (clojure.lang IFn)
+           (java.util.concurrent RejectedExecutionException))
   (require
     [clojure.java.io :refer [make-parents] :as io]
     [fileape.native-gzip :refer [create-native-gzip]]
@@ -192,14 +193,17 @@
       (when (or (>= (.length file) rollover-size)
                 (>= tm-diff rollover-timeout)
                 (>= tm-diff rollover-abs-timeout))
-        ;we need to remove the file key waiting for the remove to complete
-
-        (.sendCommand
-         actor-pool
-         ActorPool$Command/DELETE
-         file-data-create
-         (:file-key file-data)
-         #(roll-and-notify roll-ch %))))
+        ;we need to make this call async to avoid deadlocks from
+        ;setting commands to the actor pool queue in the same thread that
+        ;that has taken data from the queue.
+        (future
+          (.sendCommand
+            actor-pool
+            ActorPool$Command/DELETE
+            file-data-create
+            (:file-key file-data)
+            #(roll-and-notify roll-ch %)))))
+    (catch RejectedExecutionException rej nil)
     (catch Exception e (error e e))
     (finally file-data)))
 
