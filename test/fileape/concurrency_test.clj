@@ -21,7 +21,7 @@
 
 (facts "Test file writing"
        (fact "Test future file name rollover"
-             (create-future-file-name "blabla_abc.gz_000" 0) => "/blabla_abc.000.gz")
+             (create-future-file-name "blabla_abc.gz_000") => "/blabla_abc.000.gz")
 
          (fact "Write and read Gzip File"
 
@@ -50,9 +50,10 @@
 
                  ;find the rolled file and read back
 
+                 (close ape2)
+
                  (let [files (filter (fn [^File file] (re-find #"abc-" (.getName file))) (.listFiles base-dir))]
                    (> (count files) 0) => true
                    (count (flatten (read-files files))) => 3000000)
 
-                 (close ape2)
                  (shutdown-agents))))

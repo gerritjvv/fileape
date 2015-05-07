@@ -5,7 +5,7 @@
   (import [java.io File DataOutputStream FileInputStream DataInputStream]
           [java.util.concurrent.atomic AtomicInteger]
           [java.util.zip GZIPInputStream]
-          [java.io File OutputStream]))
+          [java.io File]))
 
 (defn read-file [file]
   (let [o (-> (clojure.java.io/file file) FileInputStream. GZIPInputStream. DataInputStream.)
@@ -20,7 +20,7 @@
 
 (facts "Test file writing"
        (fact "Test future file name rollover"
-             (create-future-file-name "blabla_abc.gz_000" 0) => "/blabla_abc.000.gz")
+             (create-future-file-name "blabla_abc.gz_000") => "/blabla_abc.000.gz")
 
        (fact "test write file"
 
