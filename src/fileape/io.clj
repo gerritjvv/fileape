@@ -11,11 +11,12 @@
     [clojure.string :as clj-str]
     [fileape.native-gzip :refer [create-native-gzip]]
     [fileape.bzip2 :refer [create-bzip2]]
-    [clojure.tools.logging :refer [info error]])
+    [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
            (java.io File IOException FileOutputStream BufferedOutputStream OutputStream DataOutputStream)
            (java.util.zip GZIPOutputStream)
-           (org.xerial.snappy SnappyOutputStream)))
+           (org.xerial.snappy SnappyOutputStream)
+           (java.util.concurrent CountDownLatch)))
 
 
 (defrecord CTX [root-agent roll-ch conf shutdown-flag])
@@ -84,7 +85,9 @@
       (doto out .flush .close)
       (let [^File file2 (if-not (.exists future-file-name)
                           future-file-name
-                          (io/file (create-future-file-name file)))]
+                          (let [new-name (io/file (create-future-file-name file))]
+                            (info "choosing new future file name " new-name " from " future-file-name)
+                            new-name))]
         (info "close and roll " file " to " file2)
         (.renameTo file file2)
         file2))))
@@ -152,19 +155,22 @@
 
 (defn- do-roll!
   "Helper function that calls roll-and-notify"
-  [ctx file-desc]
-  (roll-and-notify (:roll-ch ctx) file-desc))
+  [check-f ctx file-desc]
+  (roll-and-notify (:roll-ch ctx) file-desc)
+  nil)
+
 
 (defn- reducer-roll-if
   "Loops through each item in the map m and if check-f returns true calls do-roll and removed the key from m:map
    The final m:map is returned"
-  [ctx check-f m]
+  [ctx check-f m & {:keys [close-and-wait] :or {close-and-wait false}}]
   (reduce-kv (fn [m k agnt]
                ;agnt is an agent and its value is (delay file-desc)
+               (debug "check file for roll " (:file @agnt) " should roll " (check-f @agnt) " close-and-wait " close-and-wait)
                 (if (check-f @agnt)
-                  (if (fagent/send agnt (partial do-roll! ctx))
+                  (if (fagent/send agnt (partial do-roll! check-f ctx))
                     (do
-                      (fagent/close-agent agnt)
+                      (fagent/close-agent agnt :wait close-and-wait)
                       (dissoc m k))
                     m)
                   m))
@@ -172,9 +178,9 @@
 
 (defn check-roll!
   "helper function that calls reducer-roll-if in a transaction and alters the ref (:state ctx)"
-  [ctx check-f]
+  [ctx check-f & {:keys [close-and-wait] :or {close-and-wait false}}]
   (fagent/send (:root-agent ctx)
-               (partial reducer-roll-if ctx check-f)))
+               #(reducer-roll-if ctx check-f % :close-and-wait close-and-wait)))
 
 
 (defn async-write!
@@ -191,5 +197,5 @@
 
 (defn shutdown! [ctx]
   (.set ^AtomicBoolean (:shutdown-flag ctx) true)
-  (check-roll! ctx (fn [& _] true))
-  (fagent/close-agent (:root-agent ctx)))
+  (check-roll! ctx (fn [& _] true) :close-and-wait true)
+  (fagent/close-agent (:root-agent ctx) :wait true))

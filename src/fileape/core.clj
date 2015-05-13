@@ -23,7 +23,7 @@
 
 (defn roll-over-check [{:keys [rollover-size rollover-timeout rollover-abs-timeout]} {:keys [^File file ^AtomicReference updated]}]
   (let [tm-diff (- (System/currentTimeMillis) (.get updated))]
-    (or (>= (.length file) rollover-size)
+    (or (and (pos? (.length file)) (>= (.length file) rollover-size))
         (>= tm-diff rollover-timeout)
         (>= tm-diff rollover-abs-timeout))))
 
