@@ -41,22 +41,41 @@
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 
+(defn- create-zip-out [file]
+  (DataOutputStream. (GZIPOutputStream. (FileOutputStream. file))))
+
+(defn- create-buffered-zip-out [file buffer-size]
+  (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
+
+(defn- create-snappy-out [file ]
+  (DataOutputStream. (SnappyOutputStream. (FileOutputStream. file))))
+
+(defn- create-buffered-snappy-out [file buffer-size]
+  (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
+
+(defn- create-out [file]
+  (DataOutputStream. (FileOutputStream. file)))
+
+(defn- create-buffered-out [file buffer-size]
+  (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file) buffer-size)))
+
 (defn- get-output
   "Takes a file path and creates, creates an output stream using the correct codec
    and then returns it. possible values for the codec are :gzip :snappy :none"
-  [^File file {:keys [codec] :or {codec :gzip}}]
+  [^File file {:keys [codec out-buffer-size use-buffer] :or {codec :gzip out-buffer-size (* 10 1048576) use-buffer true}}]
+  (info "creating file with out-buffer-size " out-buffer-size " use-buffer " use-buffer)
   (cond
     (= codec :gzip)
-    (let [zipout (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))]
+    (let [zipout (if use-buffer (create-buffered-zip-out file out-buffer-size) (create-zip-out file))]
       {:out zipout})
     (= codec :native-gzip)
     {:out (create-native-gzip file)}
     (= codec :bzip2)
     {:out (create-bzip2 file)}
     (= codec :snappy)
-    {:out (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int (* 10 1048576)))))}
+    {:out (if use-buffer (create-buffered-snappy-out file out-buffer-size) (create-snappy-out file))}
     (= codec :none)
-    {:out (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file)))}
+    {:out (if use-buffer (create-buffered-out file out-buffer-size) (create-out file))}
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 

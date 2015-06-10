@@ -38,7 +38,9 @@
 (defn ape
   "Entrypoint to the api, creates the resources for writing"
   [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks
-           parallel-files] :or {codec :gzip check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3 rollover-abs-timeout Long/MAX_VALUE}}]
+           out-buffer-size use-buffer
+           parallel-files] :or {codec :gzip check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 3 rollover-abs-timeout Long/MAX_VALUE
+                                          out-buffer-size (* 10 1048576) use-buffer true}}]
   (let [error-ch (async/chan (async/sliding-buffer 10))
         roll-ch (async/chan (async/sliding-buffer 100))
         conf
@@ -51,6 +53,8 @@
          :parallel-files   parallel-files
          :rollover-abs-timeout rollover-abs-timeout
          :roll-ch          roll-ch
+         :out-buffer-size out-buffer-size
+         :use-buffer use-buffer
          :file-data-create (fn [& _])}
         ctx (io/create-ctx conf roll-ch)]
 
