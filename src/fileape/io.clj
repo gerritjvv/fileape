@@ -62,7 +62,7 @@
 (defn- get-output
   "Takes a file path and creates, creates an output stream using the correct codec
    and then returns it. possible values for the codec are :gzip :snappy :none"
-  [^File file {:keys [codec out-buffer-size use-buffer] :or {codec :gzip out-buffer-size (* 10 1048576) use-buffer true}}]
+  [^File file {:keys [codec out-buffer-size use-buffer] :or {codec :gzip out-buffer-size (* 10 1048576) use-buffer false}}]
   (info "creating file with out-buffer-size " out-buffer-size " use-buffer " use-buffer)
   (cond
     (= codec :gzip)
