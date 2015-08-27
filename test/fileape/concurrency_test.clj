@@ -28,7 +28,7 @@
                (let [base-dir (File. "target/tests/concurrent-write-read-gzip1")
                      _ (do
                          (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir))))
-                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 200})
+                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 1000})
                      key-stream1 (take 1 (cycle (map str (range 0 5))))
                      key-stream2 (take 1 (cycle (map str (range 10 20))))
 
@@ -37,7 +37,7 @@
                                 (doall
                                   (repeatedly thread-count
                                               #(future
-                                                (doseq [i (range 100000)]
+                                                (doseq [i (range 10000)]
                                                   (let [ bts (.getBytes (str i "\n")) ]
                                                     (write ape2 (str "abc-" (rand-nth key-stream))
                                                            (fn [{:keys [^DataOutputStream out]}] (.writeInt out (int i))))))))))]
@@ -54,6 +54,6 @@
 
                  (let [files (filter (fn [^File file] (re-find #"abc-" (.getName file))) (.listFiles base-dir))]
                    (> (count files) 0) => true
-                   (count (flatten (read-files files))) => 3000000)
+                   (count (flatten (read-files files))) => 300000)
 
                  (shutdown-agents))))
