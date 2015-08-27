@@ -26,6 +26,6 @@
                   [log4j "1.2.16"]
                   [org.xerial.snappy/snappy-java "1.1.0"]
                   [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
-                  [midje "1.6-3" :scope "test"]
+                  [midje "1.6.3" :scope "test"]
                   [org.apache.hadoop/hadoop-core "0.20.2" :exclusions [hsqldb]]
                   [org.clojure/clojure "1.5.1"]])
