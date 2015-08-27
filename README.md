@@ -7,6 +7,8 @@ on a timeout or size.
 
 ## Usage
 
+[![Build Status](https://travis-ci.org/gerritjvv/fileape.svg?branch=master)](https://travis-ci.org/gerritjvv/fileape)
+
 [![Clojars Project](http://clojars.org/fileape/latest-version.svg)](http://clojars.org/fileape)
 
 
