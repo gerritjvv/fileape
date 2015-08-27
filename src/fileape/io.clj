@@ -126,7 +126,9 @@
   (let [file (File. (io/file (select-base-dir base-dir))
                     (str file-key
                          (codec-extension codec)
-                         "_" (System/nanoTime)))]
+                         ;;javadoc for nanoTime says it might return negative values, never seen in practice
+                         ;;to avoid and future/platform proof we do Math/abs
+                         "_" (Math/abs (System/nanoTime))))]
     ;check that the file does not exist
     (if (.exists file)
       (do
