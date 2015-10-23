@@ -4,27 +4,29 @@
   fileape.io
   (:require
     [clojure.java.io :refer [make-parents] :as io]
+    [fileape.parquet.writer :as parquet-writer]
     [clj-tuple :refer [tuple]]
     [fun-utils.threads :as threads]
     [fun-utils.agent :as fagent]
     [clojure.core.async :as async]
     [clojure.string :as clj-str]
-    [fileape.native-gzip :refer [create-native-gzip]]
-    [fileape.bzip2 :refer [create-bzip2]]
+    [fileape.io-plugin :as io-plugin]
     [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
            (java.io File IOException FileOutputStream BufferedOutputStream OutputStream DataOutputStream)
            (java.util.zip GZIPOutputStream)
            (org.xerial.snappy SnappyOutputStream)
-           (java.util.concurrent CountDownLatch)))
+           (java.util.concurrent CountDownLatch)
+           (org.apache.parquet.schema MessageType)))
 
 
-(defrecord CTX [root-agent roll-ch conf shutdown-flag])
+(defrecord CTX [root-agent roll-ch conf env shutdown-flag])
 
 (defonce default-conf {:codec :gzip :threads 2})
 
-(defn create-ctx [conf roll-ch]
-  (->CTX (fagent/agent {}) roll-ch (merge default-conf conf) (AtomicBoolean. false)))
+(defn create-ctx [conf env roll-ch]
+  {:pre [conf env roll-ch]}
+  (->CTX (fagent/agent {}) roll-ch (merge default-conf conf) env (AtomicBoolean. false)))
 
 
 (defn open? [ctx]
@@ -32,52 +34,17 @@
 
 
 (defn- codec-extension [codec]
-  (cond
-    (= codec :gzip) ".gz"
-    (= codec :native-gzip) ".gz"
-    (= codec :snappy) ".snz"
-    (= codec :bzip2) ".bz2"
-    (= codec :none) ".none"
-    :else
-    (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
-
-(defn- create-zip-out [file]
-  (DataOutputStream. (GZIPOutputStream. (FileOutputStream. file))))
-
-(defn- create-buffered-zip-out [file buffer-size]
-  (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
-
-(defn- create-snappy-out [file ]
-  (DataOutputStream. (SnappyOutputStream. (FileOutputStream. file))))
-
-(defn- create-buffered-snappy-out [file buffer-size]
-  (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
-
-(defn- create-out [file]
-  (DataOutputStream. (FileOutputStream. file)))
-
-(defn- create-buffered-out [file buffer-size]
-  (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file) buffer-size)))
+  (io-plugin/create-extension codec))
 
 (defn- get-output
   "Takes a file path and creates, creates an output stream using the correct codec
-   and then returns it. possible values for the codec are :gzip :snappy :none"
-  [^File file {:keys [codec out-buffer-size use-buffer] :or {codec :gzip out-buffer-size (* 10 1048576) use-buffer false}}]
-  (info "creating file with out-buffer-size " out-buffer-size " use-buffer " use-buffer)
-  (cond
-    (= codec :gzip)
-    (let [zipout (if use-buffer (create-buffered-zip-out file out-buffer-size) (create-zip-out file))]
-      {:out zipout})
-    (= codec :native-gzip)
-    {:out (create-native-gzip file)}
-    (= codec :bzip2)
-    {:out (create-bzip2 file)}
-    (= codec :snappy)
-    {:out (if use-buffer (create-buffered-snappy-out file out-buffer-size) (create-snappy-out file))}
-    (= codec :none)
-    {:out (if use-buffer (create-buffered-out file out-buffer-size) (create-out file))}
-    :else
-    (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
+   and then returns it. possible values for the codec are :gzip :snappy :none :parquet
+    note the :out for almost all are OutputStreams except for parquet which has its own format
+    and use the :parquet key"
+  [k ^File file env {:keys [codec out-buffer-size use-buffer] :as conf}]
+  {:pre [k file codec]}
+  (info "creating file for " k " codec " codec " with out-buffer-size " out-buffer-size " use-buffer " use-buffer)
+  (io-plugin/create-plugin k file env conf))
 
 
 (defn create-future-file-name
@@ -98,10 +65,10 @@
 
 (defn- close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
-  [{:keys [^File file ^OutputStream out ^File future-file-name]}]
-  (when out
-    (io!
-      (doto out .flush .close)
+  [{:keys [file future-file-name] :as file-data}]
+  (io!
+    (io-plugin/close-plugin file-data)
+    (when (.exists (io/file file))
       (let [^File file2 (if-not (.exists future-file-name)
                           future-file-name
                           (let [new-name (io/file (create-future-file-name file))]
@@ -140,32 +107,43 @@
   "Create a file and return a map with keys file codec file-key out,
    out contains the output stream and will always be a DataOutputStream
   Keys returned are: file, codec, file-key
+
+  k: the key/topic provided on write
+  conf: configuration while the ape context was created
+  env: io plugin environment ref
+  file-key: file key created based on k
   "
-  [{:keys [codec base-dir] :as conf} file-key]
-  (let [^File file (create-file base-dir codec file-key)]
-    (make-parents file)
-    (.createNewFile file)
-    (info "create new file " (.getAbsolutePath file))
-    (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
+  [k {:keys [codec base-dir] :as conf} env file-key]
+  (try
+    (let [^File file (create-file base-dir codec file-key)]
+      (prn "create file-data " codec)
 
-    (assoc
-      (get-output file conf)
-      :file file
-      :codec codec
-      :file-key file-key
-      :future-file-name (io/file (create-future-file-name file))
-      :record-counter (AtomicLong. 0)
-      :updated (AtomicReference. (System/currentTimeMillis)))))
+      (make-parents file)
+      (.createNewFile file)
+      (info "create new file " (.getAbsolutePath file))
+      (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
-(defn- create-agent [conf k]
+      (assoc
+        (get-output k file env conf)
+        :file file
+        :codec codec
+        :file-key file-key
+        :future-file-name (io/file (create-future-file-name file))
+        :record-counter (AtomicLong. 0)
+        :updated (AtomicReference. (System/currentTimeMillis))))
+    (catch Exception e (do
+                         (error e e)
+                         (.printStackTrace e)))))
+
+(defn- create-agent [k conf env file-key]
   ;create an agent with a default mailbox-len of 10
-  (fagent/agent (create-file-data! conf k) :mailbox-len 10))
+  (fagent/agent (create-file-data! k conf env file-key) :mailbox-len 10))
 
 
 (defn- create-if-not
   "Returns [(agent (delay file-data)) map]"
-  [conf k m]
-  (if-let [o (get m k)] (tuple o m) (let [o (create-agent conf k)] (tuple o (assoc m k o)))))
+  [k conf env file-key m]
+  (if-let [o (get m k)] (tuple o m) (let [o (create-agent k conf env file-key)] (tuple o (assoc m k o)))))
 
 (defn- write-to-agent!
   "Calls the writer-f via the agent sending it the agents dereferenced result"
@@ -188,13 +166,13 @@
   (reduce-kv (fn [m k agnt]
                ;agnt is an agent and its value is (delay file-desc)
                (debug "check file for roll " (:file @agnt) " should roll " (check-f @agnt) " close-and-wait " close-and-wait)
-                (if (check-f @agnt)
-                  (if (fagent/send agnt (partial do-roll! check-f ctx))
-                    (do
-                      (fagent/close-agent agnt :wait close-and-wait)
-                      (dissoc m k))
-                    m)
-                  m))
+               (if (check-f @agnt)
+                 (if (fagent/send agnt (partial do-roll! check-f ctx))
+                   (do
+                     (fagent/close-agent agnt :wait close-and-wait)
+                     (dissoc m k))
+                   m)
+                 m))
              m m))
 
 (defn check-roll!
@@ -207,12 +185,12 @@
 (defn async-write!
   "Creates a file based on the key k, the file descriptor is cached so that its only created once
    The descriptor is passed to the writer-f, and the final state is maintained in the (:state ctx)"
-  [ctx k writer-f]
+  [k ctx file-key writer-f]
   (if (open? ctx)
     (fagent/send (:root-agent ctx)
                  (comp #(nth % 1)
                        (comp (partial write-to-agent! ctx writer-f)
-                             (partial create-if-not (:conf ctx) k))))
+                             (partial create-if-not k (:conf ctx) (:env ctx) file-key))))
     (throw (RuntimeException. "The writer context has already been closed"))))
 
 
