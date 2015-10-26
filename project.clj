@@ -1,4 +1,4 @@
-(defproject fileape "0.7.7"
+(defproject fileape "0.7.9-SNAPSHOT"
   :description "Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip"
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
@@ -11,7 +11,7 @@
                    :plugins [[lein-midje "3.0.1"]]}}
 
   :global-vars {*warn-on-reflection* true
-                *assert* false}
+                *assert* true}
 
   :scm {:name "git"
         :url "https://github.com/gerritjvv/fileape.git"}
@@ -26,6 +26,12 @@
                   [log4j "1.2.16"]
                   [org.xerial.snappy/snappy-java "1.1.0"]
                   [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+
+                  [org.apache.parquet/parquet-common "1.8.1"]
+                  [org.apache.parquet/parquet-encoding "1.8.1"]
+                  [org.apache.parquet/parquet-column "1.8.1"]
+                  [org.apache.parquet/parquet-hadoop "1.8.1"]
+
                   [midje "1.6.3" :scope "test"]
                   [org.apache.hadoop/hadoop-core "0.20.2" :exclusions [hsqldb]]
                   [org.clojure/clojure "1.5.1"]])
