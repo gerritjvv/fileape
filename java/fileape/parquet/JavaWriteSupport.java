@@ -4,6 +4,7 @@ import clojure.lang.ISeq;
 import clojure.lang.PersistentVector;
 import clojure.lang.Seqable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.log4j.Logger;
 import org.apache.parquet.hadoop.api.WriteSupport;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.api.RecordConsumer;
@@ -18,6 +19,8 @@ import java.util.*;
  * Implements write support for standard java Map, List, and primitives
  */
 public class JavaWriteSupport extends WriteSupport<Map<?, ?>> {
+
+    private static final Logger LOG = Logger.getLogger(JavaWriteSupport.class);
 
     private RecordConsumer recordConsumer;
     private MessageType schema;
@@ -44,120 +47,129 @@ public class JavaWriteSupport extends WriteSupport<Map<?, ?>> {
 
 
     public void write(Map<?, ?> msg) {
+        if(msg == null)
+            return;
+
         recordConsumer.startMessage();
-        writeData(schema, msg, false);
+        writeData(msg, schema);
         recordConsumer.endMessage();
     }
 
-    private void writeData(GroupType type, Map<?, ?> group){
-        writeData(type, group, true);
-    }
+    private void writeData(final Map arr, final GroupType type) {
+        if (arr == null) {
+            return;
+        }
+        final int fieldCount = type.getFieldCount();
 
-    /**
-     * Recursively write data for each type.
-     * The type schema is iterated and data drawn from the group:Map.
-     * Each message in the schema should be represented as a Map, Lists can be List, Object[], ISeq, Seqable or Collection
-     */
-    private void writeData(GroupType type, Map<?, ?> group, boolean writeGroup) {
+        for (int field = 0; field < fieldCount; ++field) {
+            final Type fieldType = type.getType(field);
+            final String fieldName = fieldType.getName();
+            final Object value = arr.get(fieldName);
 
-        if(writeGroup)
-            recordConsumer.startGroup();
-
-        for (int field = 0; field < type.getFieldCount(); field++) {
-
-            Type fieldType = type.getType(field);
-
-            Object fieldValue = group.get(fieldType.getName());
-
-
-            if (fieldValue == null) {
-                if (fieldType.isRepetition(Type.Repetition.REQUIRED))
-                    throw new RuntimeException("Value for field " + fieldType.getName() + " cannot be null");
-                else
-                    continue;
+            if (value == null) {
+                continue;
             }
+            recordConsumer.startField(fieldName, field);
 
             if (fieldType.isPrimitive()) {
-                if (fieldType.isRepetition(Type.Repetition.REPEATED)) {
-                    List list = asList(fieldValue);
-                    if (list.size() > 0) {
-
-                        recordConsumer.startField(fieldType.getName(), field);
-                        writePrimitiveList(fieldType.asPrimitiveType(), asList(fieldValue));
-
-                        recordConsumer.endField(fieldType.getName(), field);
-
-                    }
-                } else {
-
-                    recordConsumer.startField(fieldType.getName(), field);
-                    writePrimitiveValue(fieldType.asPrimitiveType(), fieldValue);
-
-                    recordConsumer.endField(fieldType.getName(), field);
-                }
-
+                writePrimitive(fieldType.asPrimitiveType(), value);
             } else {
-                //not a primitive, must create a group, but groups can also be repeated
-                if (fieldType.isRepetition(Type.Repetition.REPEATED)) {
-                    List list = asList(fieldValue);
-                    if (list.size() > 0) {
-
-                            recordConsumer.startField(fieldType.getName(), field);
-                            writeDataList(fieldType.asGroupType(), list);
-                            recordConsumer.endField(fieldType.getName(), field);
-                    }
-                } else {
-                    if (fieldValue instanceof Map) {
-                        Map map = (Map) fieldValue;
-                        if (map.size() > 0) {
-
-                            recordConsumer.startField(fieldType.getName(), field);
-                            writeData(fieldType.asGroupType(), map, true);
-                            recordConsumer.endField(fieldType.getName(), field);
+                recordConsumer.startGroup();
+                if (value instanceof Map) {
+                    writeData((Map)value, fieldType.asGroupType());
+                }else{
+                    if (fieldType.asGroupType().getRepetition().equals(Type.Repetition.REPEATED)) {
+                        writeArray((List) value, fieldType.asGroupType());
+                    } else {
+                        if(value instanceof Map)
+                            writeData((Map)value, fieldType.asGroupType());
+                        else {
+                            writeArray((List)value, fieldType.asGroupType());
                         }
-                    } else
-                        throw createMessageMustBeMapException(fieldType, fieldValue);
+                    }
                 }
+
+                recordConsumer.endGroup();
             }
 
-
-        }
-
-        if(writeGroup)
-        recordConsumer.endGroup();
-    }
-
-
-    /**
-     * Helper function to create RuntimeException when a Map is expected but another type is found
-     */
-    private RuntimeException createMessageMustBeMapException(Type type, Object val) {
-        return new RuntimeException("A message must be represented as an intance that implements java.util.Map but got " + val + " but got " + type.getName());
-    }
-
-    /**
-     * Helper function to call writeData for each item in the list, also we check that each item in the list is of type Map
-     */
-    private void writeDataList(GroupType groupType, List list) {
-        for (Object val : list) {
-            if (val instanceof Map)
-                writeData(groupType, (Map) val, true);
-            else
-                throw createMessageMustBeMapException(groupType, val);
+            recordConsumer.endField(fieldName, field);
         }
     }
 
-    /**
-     * Helper function to call writePrimitiveValue for each item in the list
-     *
-     * @param primitiveType
-     * @param list
-     */
-    private void writePrimitiveList(PrimitiveType primitiveType, List list) {
-        for (Object val : list)
-            writePrimitiveValue(primitiveType, val);
+    private void writeArray(final List array, final GroupType type) {
+        if (array == null) {
+            return;
+        }
+
+        final int fieldCount = type.getFieldCount();
+        for (int field = 0; field < fieldCount; ++field) {
+            final Type subType = type.getType(field);
+            recordConsumer.startField(subType.getName(), field);
+            for (int i = 0; i < array.size(); ++i) {
+                final Object subValue = array.get(i);
+                if (subValue != null) {
+                    if (subType.isPrimitive()) {
+                        if (subValue instanceof List) {
+                            writePrimitive(subType.asPrimitiveType(), ((List) subValue).get(field));// 0 ?
+                        } else {
+                            writePrimitive(subType.asPrimitiveType(), subValue);
+                        }
+                    } else {
+
+                            recordConsumer.startGroup();
+
+
+                            if(subValue instanceof Map)
+                                writeData((Map) subValue, subType.asGroupType());
+                            else if(subType.isPrimitive())
+                                writePrimitive(subType.asPrimitiveType(), subValue);
+                            else if(!subType.isPrimitive()){
+                                //if not a primitive we have a mismatch between how arrays in the schema are
+                                //represented group <name> { repeated bag { group/primitive-type <name> } }
+                                if(subValue instanceof List)
+                                    writeArray(asList(subValue), subType.asGroupType());
+                                else{
+                                    //subValue is primitive but we have a group value
+                                    writeArray(Arrays.asList(subValue), subType.asGroupType());
+                                }
+
+                            }
+                            recordConsumer.endGroup();
+
+                    }
+                }
+            }
+            recordConsumer.endField(subType.getName(), field);
+        }
     }
 
+    private void writePrimitive(final PrimitiveType type, final Object v) {
+        if (v == null) {
+            return;
+        }
+        switch (type.getPrimitiveTypeName()) {
+            case BOOLEAN:
+                recordConsumer.addBoolean((v instanceof Boolean) ? ((Boolean) v).booleanValue() : false);
+                break;
+            case BINARY:
+                recordConsumer.addBinary(asBinary(v));
+                break;
+            case INT32:
+                recordConsumer.addInteger((v instanceof Number) ? ((Number) v).intValue() : -1);
+                break;
+            case INT64:
+                recordConsumer.addLong((v instanceof Number) ? ((Number) v).longValue() : -1);
+                break;
+            case FLOAT:
+                recordConsumer.addFloat((v instanceof Number) ? ((Number) v).floatValue() : -1);
+                break;
+            case DOUBLE:
+                recordConsumer.addDouble((v instanceof Number) ? ((Number) v).doubleValue() : -1);
+                break;
+            default:
+                throw new RuntimeException("Type " + type.getPrimitiveTypeName() + " is not supported");
+        }
+    }
 
     /**
      * Coerce an entry to a List, supports List, ISeq, Seqable, Object[], Collection
@@ -181,38 +193,6 @@ public class JavaWriteSupport extends WriteSupport<Map<?, ?>> {
             return new ArrayList(0);
         else
             throw new RuntimeException("Type " + entry + " not supported");
-    }
-
-    /**
-     * Write primitive values
-     *
-     * @param primitiveType
-     * @param v
-     */
-    private void writePrimitiveValue(PrimitiveType primitiveType, Object v) {
-
-        switch (primitiveType.getPrimitiveTypeName()) {
-            case BOOLEAN:
-                recordConsumer.addBoolean((v instanceof Boolean) ? ((Boolean) v).booleanValue() : false);
-                break;
-            case BINARY:
-                recordConsumer.addBinary(asBinary(v));
-                break;
-            case INT32:
-                recordConsumer.addInteger((v instanceof Number) ? ((Number) v).intValue() : -1);
-                break;
-            case INT64:
-                recordConsumer.addLong((v instanceof Number) ? ((Number) v).longValue() : -1);
-                break;
-            case FLOAT:
-                recordConsumer.addFloat((v instanceof Number) ? ((Number) v).floatValue() : -1);
-                break;
-            case DOUBLE:
-                recordConsumer.addDouble((v instanceof Number) ? ((Number) v).doubleValue() : -1);
-                break;
-            default:
-                throw new RuntimeException("Type " + primitiveType.getPrimitiveTypeName() + " is not supported");
-        }
     }
 
     /**
