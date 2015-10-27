@@ -62,6 +62,14 @@
 (defn get-base-dir [{:keys [ctx]}]
   (get-in ctx [:conf :base-dir]))
 
+(defn ape-new-ctx
+  "Create a new ape ctx with the k v applied to the config,
+   usage: (ape-new-ctx ape :codec :lzo)"
+  [{:keys [ctx] :as ape-ctx} k v]
+  (assoc
+    ape-ctx
+    :ctx (io/update-ctx ctx (assoc (:conf ctx) k v))))
+
 (defn ape
   "Entrypoint to the api, creates the resources for writing
    roll-callbacks - on each file roll all functions in this list are called

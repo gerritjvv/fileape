@@ -29,6 +29,11 @@
   (->CTX (fagent/agent {}) roll-ch (merge default-conf conf) env (AtomicBoolean. false)))
 
 
+(defn update-ctx
+  "Returns a new CTX with a new config applied, all other values are kept as is"
+  [{:keys [root-agent roll-ch env shutdown-flag]} conf]
+  (->CTX root-agent roll-ch conf env shutdown-flag))
+
 (defn open? [ctx]
   (not (.get ^AtomicBoolean (:shutdown-flag ctx))))
 
