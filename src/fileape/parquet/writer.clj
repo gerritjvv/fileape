@@ -10,6 +10,7 @@
   fileape.parquet.writer
   (:require
     [clojure.string :as string]
+    [clojure.tools.logging :refer [info]]
     [clojure.java.io :as io])
   (:import
     (fileape.parquet JavaWriteSupport)
@@ -26,9 +27,10 @@
 (defn record-writer
   "Create a Parquet Record write that will accept Maps as groups and messages and primitive Java/Clojure types as values"
   [conf ^MessageType schema ^File file ^CompressionCodecName codec]
+  (info "record-writer with conf " conf)
   (let [conf (doto
                (Configuration.)
-               (.setLong "parquet.block.size" (get conf :parquet-block-size 136314880))
+               (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
                (.setLong "parquet.page.size" (get conf :parquet-page-size 1048576))
                (.setBoolean "parquet.compression" (get conf :parquet-enable-dictionary false)))
 
@@ -47,11 +49,11 @@
   [schema]
   (MessageTypeParser/parseMessageType (str schema)))
 
-(defn open-parquet-file! [^MessageType type file & {:keys [codec] :or {codec :snappy} :as conf}]
+(defn open-parquet-file! [^MessageType type file & {:keys [parquet-codec] :or {parquet-codec :snappy} :as conf}]
   (let [file-obj (io/file file)]
     {:record-writer (record-writer conf
                                    type file-obj
-                                   (CompressionCodecName/valueOf CompressionCodecName (string/upper-case (name codec))))
+                                   (CompressionCodecName/valueOf CompressionCodecName (string/upper-case (name parquet-codec))))
      :file          file
      :type          type}))
 

@@ -37,13 +37,14 @@
     (throw (RuntimeException. (str "Parquet config must have parquet-codec, and message-type:MessageType but got " parquet-codec " " message-type " for k " k " conf is " (keys env))))))
 
 
-(defn open-parquet-file! [k file env {:keys [env-key-parser] :or {env-key-parser identity}}]
+(defn open-parquet-file! [k file env {:keys [env-key-parser] :or {env-key-parser identity} :as conf}]
   (let [env-key (env-key-parser k)
-        {:keys [parquet-codec message-type] :as entry}  (get @env env-key)]
+        {:keys [parquet-codec message-type parquet-block-size parquet-page-size parquet-enable-dictionary] :as entry}  (get @env env-key)]
     (validate-parquet-conf! env-key @env entry)
     ;delete the file because the parquet open file will create it and fail if the file exists
     (.delete ^File (clojure.java.io/file file))
-    (parquet-writer/open-parquet-file! message-type file :codec parquet-codec)))
+    (apply parquet-writer/open-parquet-file! message-type file :codec parquet-codec
+                                                               (mapcat identity conf))))
 
 (defn close-parquet-file! [parquet]
   (parquet-writer/close! parquet))
