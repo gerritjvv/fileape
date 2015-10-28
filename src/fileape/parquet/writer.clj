@@ -28,9 +28,9 @@
   [conf ^MessageType schema ^File file ^CompressionCodecName codec]
   (let [conf (doto
                (Configuration.)
-               (.setLong "parquet.block.size" (get conf :parquet-block-size 104857600))
+               (.setLong "parquet.block.size" (get conf :parquet-block-size 136314880))
                (.setLong "parquet.page.size" (get conf :parquet-page-size 1048576))
-               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary true)))
+               (.setBoolean "parquet.compression" (get conf :parquet-enable-dictionary false)))
 
         path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
         output-format (ParquetOutputFormat. (JavaWriteSupport. schema))
@@ -47,7 +47,7 @@
   [schema]
   (MessageTypeParser/parseMessageType (str schema)))
 
-(defn open-parquet-file! [^MessageType type file & {:keys [codec] :or {codec :gzip} :as conf}]
+(defn open-parquet-file! [^MessageType type file & {:keys [codec] :or {codec :snappy} :as conf}]
   (let [file-obj (io/file file)]
     {:record-writer (record-writer conf
                                    type file-obj

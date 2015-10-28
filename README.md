@@ -191,7 +191,7 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 ## Parquet Properties
 <table border="0">
 <tr><td><b>Name</b></td><td><b>Description</b></td></tr>
-<tr><td>:parquet-block-size</td><td>10485760, the bigger this value the more memory is used</td></tr>
+<tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
 <tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
 <tr><td>:parquet-enable-dictionary</td> false<td></td></tr>
