@@ -16,4 +16,4 @@ if [ "$?" -ne 0 ]; then
  exit -1
 fi
 
-cd "$DIR"; lein install; 
+cd "$DIR"; LEIN_SNAPSHOTS_IN_RELEASE=true lein install; 
