@@ -3,7 +3,8 @@
 
   fileape.util.io-util
   (:require [fileape.parquet.writer :as parquet-writer]
-            [clojure.string :as string])
+            [clojure.string :as string]
+            [clojure.java.io :as io])
   (:import (java.io DataOutputStream FileOutputStream BufferedOutputStream File)
            (java.util.zip GZIPOutputStream)
            (org.xerial.snappy SnappyOutputStream)
@@ -12,22 +13,22 @@
 
 
 (defn create-zip-out [file]
-  (DataOutputStream. (GZIPOutputStream. (FileOutputStream. file))))
+  (DataOutputStream. (GZIPOutputStream. (FileOutputStream. (io/file file)))))
 
 (defn create-buffered-zip-out [file buffer-size]
-  (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
+  (DataOutputStream. (GZIPOutputStream. (BufferedOutputStream. (FileOutputStream. (io/file file)) (int buffer-size)))))
 
 (defn create-snappy-out [file]
-  (DataOutputStream. (SnappyOutputStream. (FileOutputStream. file))))
+  (DataOutputStream. (SnappyOutputStream. (FileOutputStream. (io/file file)))))
 
 (defn create-buffered-snappy-out [file buffer-size]
-  (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. file) (int buffer-size)))))
+  (DataOutputStream. (SnappyOutputStream. (BufferedOutputStream. (FileOutputStream. (io/file file)) (int buffer-size)))))
 
 (defn create-out [file]
-  (DataOutputStream. (FileOutputStream. file)))
+  (DataOutputStream. (FileOutputStream. (io/file file))))
 
 (defn create-buffered-out [file buffer-size]
-  (DataOutputStream. (BufferedOutputStream. (FileOutputStream. file) buffer-size)))
+  (DataOutputStream. (BufferedOutputStream. (FileOutputStream. (io/file file)) buffer-size)))
 
 (defn validate-parquet-conf! [k env {:keys [parquet-codec message-type]}]
   (when-not

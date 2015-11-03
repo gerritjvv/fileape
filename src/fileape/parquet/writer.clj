@@ -11,9 +11,9 @@
   (:require
     [clojure.string :as string]
     [clojure.tools.logging :refer [info]]
-    [clojure.java.io :as io])
+    [clojure.java.io :as io]
+    [fileape.parquet.write-support :as writer-support])
   (:import
-    (fileape.parquet JavaWriteSupport)
     (org.apache.hadoop.fs FileSystem Path)
     (org.apache.hadoop.conf Configuration)
     (org.apache.parquet.schema MessageType MessageTypeParser)
@@ -35,7 +35,7 @@
                (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary true)))
 
         path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
-        output-format (ParquetOutputFormat. (JavaWriteSupport. schema))
+        output-format (ParquetOutputFormat. (writer-support/java-write-support schema {}))
         record-writer (.getRecordWriter output-format conf path codec)]
 
     record-writer))
