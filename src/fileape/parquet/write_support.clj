@@ -8,7 +8,8 @@
            (org.apache.parquet.schema MessageType GroupType Type$Repetition OriginalType Type PrimitiveType PrimitiveType$PrimitiveTypeName)
            (java.util Map Date)
            (org.apache.parquet.io.api RecordConsumer Binary)
-           (java.util.concurrent TimeUnit)))
+           (java.util.concurrent TimeUnit)
+           (fileape Util)))
 
 
 (declare write-primitive-val)
@@ -16,12 +17,12 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;; multi methods headers
+
 (defmulti write-val
           "Write a value to parquet according to the provided schema and compatible with Hive,
            dispatched on originalType, if its a Map or List we write the Map or List out, otherwise
            we send to write-type-val which dispatches on type"
           (fn [rconsumer schema val] (.getOriginalType ^GroupType schema)))
-
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,11 +46,6 @@
     PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float val))
     PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double val))))
 
-(defn nil-or-empty? [v]
-  (or
-    (nil? v)
-    (and (coll? v) (empty? v))))
-
 (defn write-map-fields [^RecordConsumer rconsumer ^GroupType schema val]
   (let [field-count (.getFieldCount schema)
         ^Map val-map val]
@@ -57,7 +53,7 @@
       (let [^Type field-type (.getType schema (int field))
             ^String field-name (.getName field-type)]
         (when-let [m-val (.get val-map field-name)]
-          (when-not (nil-or-empty? m-val)
+          (when (Util/notNilOrEmpty m-val)
             (.startField rconsumer field-name (int field))
             (write-val   rconsumer field-type m-val)
             (.endField   rconsumer field-name (int field))))))))
@@ -121,7 +117,9 @@
                  (.endGroup rconsumer))
                nil val)))
 
-(defn date->int-seconds [^Date date]
+(defn date->int-seconds
+  "Convert a date to seconds and return a casted int"
+  [^Date date]
   (int (.toSeconds TimeUnit/MILLISECONDS (.getTime date))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

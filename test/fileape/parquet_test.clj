@@ -120,7 +120,6 @@ hive->parquet-schema [hive-type-map]
   "Test that we can write a java date using the hive schema to represent it as a int32"
   []
   (let [date (Date.)]
-
     (=
       (first
         (with-parquet-writer
