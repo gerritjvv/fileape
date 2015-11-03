@@ -147,6 +147,34 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 
 ```
 
+## Parquet
+
+### Clojure
+
+```clojure
+
+(require '[fileape.parquet.writer :as pwriter] :reload)
+(require '[fileape.core :as ape] :reload)
+
+
+(def ape2 (ape/ape {:codec :parquet :base-dir "/tmp/testdir" :parquet-codec "gzip" :message-type (pwriter/test-schema)}))
+
+;;for each key we must register a parquet schema and codec
+;; the fileape.parquet.writer namespace has helper functions for compiling parquet definition schemas
+
+(ape/update-env! ape2 "a" :parquet-codec :gzip :message-type (pwriter/test-schema))
+
+
+;;; note that the callback function sets a :parquet key
+;;; this contains the open parquet file context
+(ape/write ape2 "a" (fn [{:keys [parquet]}] 
+							(pwriter/write! parquet
+											{"owner" "abc" "ownerPhoneNumbers" ["1212" "1212"] "contacts" 
+                                                  [{"name" "contact-a" "phoneNumber" "1233"} {"name" "contact-a" "phoneNumber" "1234"} {"name" "contact-a" "phoneNumber" "1235"}] "meta" {"k" "12" "v" "abc"}})))
+
+(ape/close ape2)
+```
+
 ## Properties
 
 <table border="0">
@@ -160,7 +188,15 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 <tr><td>:rollover-abs-timeout</td><td>A file is only open rollover-abs-timeout milliseconds, default is Long/MAX_VALUE</td></tr>
 </table>
 
+## Parquet Properties
+<table border="0">
+<tr><td><b>Name</b></td><td><b>Description</b></td></tr>
+<tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
+<tr><td>:parquet-page-size</td><td>1048576</td></tr>
+<tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
+<tr><td>:parquet-enable-dictionary</td> false<td></td></tr>
 
+</table>
 
 ## License
 

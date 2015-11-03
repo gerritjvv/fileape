@@ -29,6 +29,11 @@
   (->CTX (fagent/agent {}) roll-ch (merge default-conf conf) env (AtomicBoolean. false)))
 
 
+(defn update-ctx
+  "Returns a new CTX with a new config applied, all other values are kept as is"
+  [{:keys [root-agent roll-ch env shutdown-flag]} conf]
+  (->CTX root-agent roll-ch conf env shutdown-flag))
+
 (defn open? [ctx]
   (not (.get ^AtomicBoolean (:shutdown-flag ctx))))
 
@@ -69,13 +74,13 @@
   (io!
     (io-plugin/close-plugin file-data)
     (when (.exists (io/file file))
-      (let [^File file2 (if-not (.exists future-file-name)
+      (let [^File file2 (if-not (.exists (io/file future-file-name))
                           future-file-name
                           (let [new-name (io/file (create-future-file-name file))]
                             (info "choosing new future file name " new-name " from " future-file-name)
                             new-name))]
         (info "close and roll " file " to " file2)
-        (.renameTo file file2)
+        (.renameTo (io/file file) file2)
         file2))))
 
 (defn- roll-and-notify

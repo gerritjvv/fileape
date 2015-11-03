@@ -11,7 +11,7 @@
 
 (defonce ^BZip2Codec bzip2-codec (do (let [codec (BZip2Codec.)]
                                      (if (instance? Configurable codec)
-                                       (.setConf codec conf))
+                                       (.setConf ^Configurable codec conf))
                                      codec)))
 
 ;use a channel as a cache, the dropping buffer is not required but 

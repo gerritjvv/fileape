@@ -1,8 +1,25 @@
-;;see https://github.com/gerritjvv/fileape for usage
-(ns fileape.core
-  (require
-    [fileape.io :as io]
+(ns
+  ^{:doc
+    "entry point namespace, for usage see https://github.com/gerritjvv/fileape
 
+     (require '[fileape.core :refer :all])
+     (import '[java.io File DataOutputStream])
+     (defn callback-f [{:keys [file]}]
+        (prn \"File rolled \" file))
+        (def ape2 (ape {:codec :gzip
+                        :base-dir \"testdir\"
+                        :check-freq 5000
+                        :rollover-size 134217728
+                        :rollover-timeout 60000
+                        :roll-callbacks [callback-f]}))
+                        (write ape2 \"abc-123\" (fn [{:keys [^DataOutputStream out]}]
+                                                    (.writeInt out (int 1))))
+         (close ape2)
+    "}
+
+  fileape.core
+  (:require
+    [fileape.io :as io]
     [clojure.core.async :as async]
     [fun-utils.core :as fun-utils]
     [clojure.tools.logging :refer [info error]]
@@ -61,6 +78,14 @@
 
 (defn get-base-dir [{:keys [ctx]}]
   (get-in ctx [:conf :base-dir]))
+
+(defn ape-new-ctx
+  "Create a new ape ctx with the k v applied to the config,
+   usage: (ape-new-ctx ape :codec :lzo)"
+  [{:keys [ctx] :as ape-ctx} k v]
+  (assoc
+    ape-ctx
+    :ctx (io/update-ctx ctx (assoc (:conf ctx) k v))))
 
 (defn ape
   "Entrypoint to the api, creates the resources for writing

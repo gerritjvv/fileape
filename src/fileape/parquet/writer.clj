@@ -10,9 +10,10 @@
   fileape.parquet.writer
   (:require
     [clojure.string :as string]
-    [clojure.java.io :as io])
+    [clojure.tools.logging :refer [info]]
+    [clojure.java.io :as io]
+    [fileape.parquet.write-support :as writer-support])
   (:import
-    (fileape.parquet JavaWriteSupport)
     (org.apache.hadoop.fs FileSystem Path)
     (org.apache.hadoop.conf Configuration)
     (org.apache.parquet.schema MessageType MessageTypeParser)
@@ -25,13 +26,16 @@
 
 (defn record-writer
   "Create a Parquet Record write that will accept Maps as groups and messages and primitive Java/Clojure types as values"
-  [^MessageType schema ^File file ^CompressionCodecName codec]
+  [conf ^MessageType schema ^File file ^CompressionCodecName codec]
+  (info "record-writer with conf " conf)
   (let [conf (doto
                (Configuration.)
-               (.setBoolean "parquet.enable.dictionary" false))
+               (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
+               (.setLong "parquet.page.size" (get conf :parquet-page-size 1048576))
+               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary true)))
 
         path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
-        output-format (ParquetOutputFormat. (JavaWriteSupport. schema))
+        output-format (ParquetOutputFormat. (writer-support/java-write-support schema {}))
         record-writer (.getRecordWriter output-format conf path codec)]
 
     record-writer))
@@ -45,10 +49,11 @@
   [schema]
   (MessageTypeParser/parseMessageType (str schema)))
 
-(defn open-parquet-file! [^MessageType type file & {:keys [codec] :or {codec :gzip}}]
+(defn open-parquet-file! [^MessageType type file & {:keys [parquet-codec] :or {parquet-codec :snappy} :as conf}]
   (let [file-obj (io/file file)]
-    {:record-writer (record-writer type file-obj
-                                   (CompressionCodecName/valueOf CompressionCodecName (string/upper-case (name codec))))
+    {:record-writer (record-writer conf
+                                   type file-obj
+                                   (CompressionCodecName/valueOf CompressionCodecName (string/upper-case (name parquet-codec))))
      :file          file
      :type          type}))
 
@@ -76,21 +81,24 @@
                                                                     }
                                       }"))
 
+
+
 (defn test-file []
   (let [fname "/tmp/testp"
         f (io/file fname)]
     (when (.exists f)
       (.delete f))
     (open-parquet-file! (parse-schema "message AddressBook {
-                                                           required binary owner;
-                                                           repeated binary ownerPhoneNumbers;
-                                                           repeated group contacts {
-                                                                                        required binary name;
-                                                                                        optional binary phoneNumber;
-                                                                                    }
-                                                           optional group meta {
-                                                                    required binary k;
-                                                                    required binary v;
-                                                                    }
+                                          optional group categories { repeated group bag { optional int64 array_element; }}
+                                          optional group deals { repeated group bag { optional group array_element { optional int64 id; optional double price; } }}\n
                                       }")
+                        fname)))
+
+
+(defn test-file2 []
+  (let [fname "/tmp/testp"
+        f (io/file fname)]
+    (when (.exists f)
+      (.delete f))
+    (open-parquet-file! (test-schema)
                         fname)))

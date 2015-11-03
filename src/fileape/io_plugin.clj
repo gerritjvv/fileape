@@ -68,14 +68,15 @@
 
 (defmethod update-env! :parquet [k env _ & {:keys [parquet-codec message-type]}]
   (let [entry {:parquet-codec parquet-codec :message-type message-type}]
-    (io-util/validate-parquet-conf! entry)
+    (io-util/validate-parquet-conf! k env entry)
     (dosync
       (alter env assoc k entry))))
 
 (defmethod update-env! :default [& _])
 
 
-(defmethod validate-env! :parquet [k env conf]
-  (io-util/validate-parquet-conf! (get @env k)))
+(defmethod validate-env! :parquet [k env {:keys [env-key-parser] :or {env-key-parser identity}}]
+  (let [env-key (env-key-parser k)]
+    (io-util/validate-parquet-conf! env-key @env (get @env env-key))))
 
 (defmethod validate-env! :default [& _] true)
