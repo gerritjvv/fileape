@@ -149,6 +149,38 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 
 ## Parquet
 
+*Not on Schemas*
+
+This parquet implementation supports the Hive way of representing Maps and Lists.
+
+Note repeated attributes are represented, i.e if you want a repeated element it needs to be a List.
+
+*Lists*
+
+Hive lists are marked in the schema with ```originalType == java.util.List```
+And the schema is:
+
+```
+ optional group addresses (LIST) {
+                        repeated group bag {
+                          optional group array_element {
+                            optional binary country;
+                            optional binary city;
+                          }
+                        }
+ }
+```
+I know this is wierd but this is how Hive likes it in parquet.
+
+*Maps*
+
+Maps are groups and groups are Maps.
+
+
+*Extra support or change*
+
+To change what other original types can be written use the multimethod in ```fileape.parquet.write-support.write-extended-val```
+
 ### Clojure
 
 ```clojure
@@ -169,8 +201,7 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 ;;; this contains the open parquet file context
 (ape/write ape2 "a" (fn [{:keys [parquet]}] 
 							(pwriter/write! parquet
-											{"owner" "abc" "ownerPhoneNumbers" ["1212" "1212"] "contacts" 
-                                                  [{"name" "contact-a" "phoneNumber" "1233"} {"name" "contact-a" "phoneNumber" "1234"} {"name" "contact-a" "phoneNumber" "1235"}] "meta" {"k" "12" "v" "abc"}})))
+												  {"name" "abc" "addresses" [{"city" "122" "country" "1"}]})))
 
 (ape/close ape2)
 ```

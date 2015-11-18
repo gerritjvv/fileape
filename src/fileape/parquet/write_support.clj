@@ -11,7 +11,6 @@
            (org.apache.parquet.io.api RecordConsumer Binary)
            (java.util.concurrent TimeUnit)
            (fileape Util)
-           (java.util.concurrent.atomic AtomicInteger)
            (clojure.lang ISeq)))
 
 
@@ -51,8 +50,19 @@
 (defn end-group [^RecordConsumer rconsumer] (.endGroup rconsumer))
 
 
+(defn date->int-seconds
+  "Convert a date to seconds and return a casted int"
+  [^Date date]
+  (int (.toSeconds TimeUnit/MILLISECONDS (.getTime date))))
+
+
 (defmulti write-extended-val "Any object other than a Java primitive, the dispatch is based on the Type::originalType" (fn [rconsumer ^Type schema val] (.getOriginalType schema)))
 
+
+(defmethod write-val OriginalType/DATE [^RecordConsumer rconsumer ^Type schema val]
+  ;;write hive compatible date
+  ;;https://issues.apache.org/jira/secure/attachment/12696987/HIVE-8119.patch
+  (write-primitive-val rconsumer PrimitiveType$PrimitiveTypeName/INT32 (date->int-seconds val)))
 
 ;;;;;;; optional group mylist (LIST) { repeated group bag {optional type array_element;}}
 (defmethod write-extended-val OriginalType/LIST [rconsumer ^Type schema val]
@@ -121,7 +131,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; public functions
-
 
 (defn java-write-support
   "Returns an instance of WriteSupport that will correctly
