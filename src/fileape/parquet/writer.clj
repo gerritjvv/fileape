@@ -70,15 +70,17 @@
 (defn test-schema []
   (parse-schema "message AddressBook {
                                                            required binary owner;
-                                                           repeated binary ownerPhoneNumbers;
-                                                           repeated group contacts {
-                                                                                        required binary name;
-                                                                                        optional binary phoneNumber;
-                                                                                    }
-                                                           optional group meta {
-                                                                    required binary k;
-                                                                    required binary v;
-                                                                    }
+                                                           optional group content_categories (LIST) {
+                                                              repeated group bag {
+                                                                optional group array_element {
+                                                                    optional int64 id;
+                                                                    optional double price;
+                                                                    optional binary pricingtype;
+                                                                    optional double price_usd;
+                                                                 }
+                                                              }
+                                                           }
+
                                       }"))
 
 
