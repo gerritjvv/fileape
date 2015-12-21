@@ -58,12 +58,6 @@
 
 (defmulti write-extended-val "Any object other than a Java primitive, the dispatch is based on the Type::originalType" (fn [rconsumer ^Type schema val] (.getOriginalType schema)))
 
-
-(defmethod write-val OriginalType/DATE [^RecordConsumer rconsumer ^Type schema val]
-  ;;write hive compatible date
-  ;;https://issues.apache.org/jira/secure/attachment/12696987/HIVE-8119.patch
-  (write-primitive-val rconsumer PrimitiveType$PrimitiveTypeName/INT32 (date->int-seconds val)))
-
 ;;;;;;; optional group mylist (LIST) { repeated group bag {optional type array_element;}}
 (defmethod write-extended-val OriginalType/LIST [rconsumer ^Type schema val]
   (when-not (or (instance? List val) (instance? ISeq val))
@@ -86,6 +80,11 @@
         (end-field rconsumer "bag" 0)
         (end-group rconsumer)))
 
+(defmethod write-extended-val OriginalType/DATE [rconsumer schema val]
+  ;;write hive compatible date
+  ;;https://issues.apache.org/jira/secure/attachment/12696987/HIVE-8119.patch
+  (write-primitive-val rconsumer PrimitiveType$PrimitiveTypeName/INT32 (date->int-seconds val)))
+
 
 ;;Default is a Group and the val type must be a Map
 (defmethod write-extended-val :default [rconsumer ^Type schema val]
@@ -106,6 +105,7 @@
                 (end-field rconsumer field-name i))
               (recur (inc i)))))
         (end-group rconsumer)))
+
 
 (defn write-val
   "Write a primitive or extend (List Map) value"
