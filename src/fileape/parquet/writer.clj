@@ -69,36 +69,15 @@
 
 (defn test-schema []
   (parse-schema "message AddressBook {
-                                                           required binary owner;
-                                                           repeated binary ownerPhoneNumbers;
-                                                           repeated group contacts {
-                                                                                        required binary name;
-                                                                                        optional binary phoneNumber;
-                                                                                    }
-                                                           optional group meta {
-                                                                    required binary k;
-                                                                    required binary v;
-                                                                    }
+                                                           required binary name;
+                                                           optional group addresses (LIST) {
+                                                              repeated group bag {
+                                                                optional group array_element {
+                                                                    optional binary country;
+                                                                    optional binary city;
+                                                                 }
+                                                              }
+                                                           }
+
                                       }"))
 
-
-
-(defn test-file []
-  (let [fname "/tmp/testp"
-        f (io/file fname)]
-    (when (.exists f)
-      (.delete f))
-    (open-parquet-file! (parse-schema "message AddressBook {
-                                          optional group categories { repeated group bag { optional int64 array_element; }}
-                                          optional group deals { repeated group bag { optional group array_element { optional int64 id; optional double price; } }}\n
-                                      }")
-                        fname)))
-
-
-(defn test-file2 []
-  (let [fname "/tmp/testp"
-        f (io/file fname)]
-    (when (.exists f)
-      (.delete f))
-    (open-parquet-file! (test-schema)
-                        fname)))
