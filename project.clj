@@ -17,7 +17,7 @@
 
   :dependencies [
                   ;[org.apache.hadoop/hadoop-common "2.2.0" :scope "provided"]
-                  [fun-utils "0.5.8-SNAPSHOT"]
+                  [fun-utils "0.6.0"]
                   [org.clojure/tools.logging "0.3.1"]
                   [log4j "1.2.16"]
                   [org.xerial.snappy/snappy-java "1.1.0"]
