@@ -1,28 +1,29 @@
 (ns
   ^{:doc "helper functions to read parquet files"}
   fileape.parquet.parquet-util
+  (:require [fileape.parquet.writer :as pwriter]
+            [clojure.java.io :as io]
+            [clojure.string :as string])
   (:import
     (org.apache.hadoop.hive.ql.io.parquet.read DataWritableReadSupport)
-    (org.apache.parquet.hadoop ParquetReader)
+    (org.apache.parquet.hadoop ParquetReader ParquetRecordReader)
     (org.apache.hadoop.fs Path)
     (org.apache.hadoop.io ArrayWritable IntWritable DoubleWritable BooleanWritable FloatWritable LongWritable Text)
     (org.apache.parquet.hadoop.api ReadSupport)
-    (org.apache.parquet.tools.read SimpleRecord SimpleRecord$NameValue)))
+    (org.apache.parquet.tools.read SimpleRecord SimpleRecord$NameValue)
+    [org.apache.hadoop.hive.ql.io.parquet.writable BinaryWritable]
+    [org.apache.hadoop.mapreduce.lib.input FileSplit]
+    [java.io File]
+    [org.apache.hadoop.hive.ql.io.parquet.convert HiveSchemaConverter]
+    [org.apache.parquet.schema MessageType]
+    [org.apache.parquet.filter2.compat FilterCompat]
+    [org.apache.hadoop.mapreduce TaskAttemptContext TaskAttemptID TaskID]
+    [org.apache.hadoop.conf Configuration]
+    [org.apache.hadoop.hive.serde2.typeinfo TypeInfo TypeInfoUtils]))
 
 
 (defprotocol IWritable
   (lift-writable [this]))
-
-(defprotocol IGet
-  (get-record-val [this]))
-
-
-(extend-protocol IGet
-  ArrayWritable
-  (get-record-val [this] (.get ^ArrayWritable this))
-
-  SimpleRecord
-  (get-record-val [this] (.getValues ^SimpleRecord this)))
 
 (extend-protocol IWritable
   IntWritable
@@ -72,24 +73,54 @@
   String
   (lift-writable [this] this))
 
-;org.apache.parquet.hadoop.api
-(defn
-  ^ParquetReader
-  open-reader [^String file & {:keys [reader-support] :or {reader-support (DataWritableReadSupport.)}}]
-  (.build (ParquetReader/builder ^ReadSupport reader-support (Path. file))))
+
+(defn ^TypeInfo str->typeinfo [^String s] (vec (TypeInfoUtils/getTypeInfosFromTypeString (string/trim s))))
+
+(defn vals-as-typeinfo [hive-type-map]
+  (mapcat str->typeinfo (flatten (vals hive-type-map))))
+
+(defn ^MessageType
+  hive->parquet-schema [hive-type-map]
+  (HiveSchemaConverter/convert (keys hive-type-map) (vals-as-typeinfo hive-type-map)))
 
 
-(defn
-  ^ArrayWritable
-  next-record [^ParquetReader reader]
-  (.read reader))
+(defn ^FileSplit file-split [^File file]
+  (FileSplit.
+    (Path. (.getParent file) (.getName file))
+    0
+    (.length file)
+    (into-array ["localhost"])))
 
-(defn record-seq
-  "Return a sequence of sequence of records
-   each ArrayWritable's real value is lifted out so that the primitive
-   values are returned"
-  [^ParquetReader reader]
-  (if-let [record (next-record reader)]
-    (concat (map lift-writable (get-record-val record))
-          (lazy-seq
-            (record-seq reader)))))
+
+
+(defn lazy-seq-hive-records [^ParquetRecordReader reader]
+  (when (.nextKeyValue reader)
+    (cons (lift-writable (.getCurrentValue reader))
+          (lazy-seq-hive-records reader))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;; public functions
+
+(defn with-parquet-writer
+  "Open a parquet writer using the schema and write msgs to it
+   Return the records using dir->parquet-records"
+  [schema msg]
+  (let [test-dir (str "target/tests/parquet-test-" (System/nanoTime))
+        file (io/file (str  test-dir "/myfile.parquet"))
+        writer (pwriter/open-parquet-file! schema file :parquet-codec :uncompressed)]
+
+    (pwriter/write! writer msg)
+    (pwriter/close! writer)
+
+    file))
+
+(defn read-hive-records [file]
+  (let [record-reader (ParquetRecordReader.
+                        (DataWritableReadSupport.)
+                        FilterCompat/NOOP)]
+
+    (.initialize record-reader
+                 (file-split file)
+                 (TaskAttemptContext. (Configuration.) (TaskAttemptID. (TaskID.) (int 0))))
+
+    (lazy-seq-hive-records record-reader)))

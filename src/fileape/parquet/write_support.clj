@@ -6,7 +6,7 @@
   (:require [fileape.util.lang :refer [case-enum]]
             [clojure.tools.logging :refer [error info]])
   (:import (org.apache.parquet.hadoop.api WriteSupport WriteSupport$WriteContext)
-           (org.apache.parquet.schema MessageType GroupType Type$Repetition OriginalType Type PrimitiveType PrimitiveType$PrimitiveTypeName)
+           (org.apache.parquet.schema MessageType GroupType OriginalType Type PrimitiveType PrimitiveType$PrimitiveTypeName)
            (java.util Map Date List)
            (org.apache.parquet.io.api RecordConsumer Binary)
            (java.util.concurrent TimeUnit)
@@ -16,6 +16,7 @@
 
 (declare write-primitive-val)
 (declare write-val)
+(declare write-message-fields)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;; private functions and default multi method impls
@@ -28,6 +29,13 @@
     (Binary/fromConstantByteArray ^"[B" v)
     (Binary/fromString (str v))))
 
+
+(defn check-is-map
+  "If v is not null then check that v is an instanceof java.util.Map, if not an exception is thrown"
+  [v]
+  (when v
+    (if-not (instance? Map v)
+      (throw (RuntimeException. (str "Val must be a map but got " v))))))
 
 (defn write-primitive-val [^RecordConsumer rconsumer ^PrimitiveType schema val]
   (case-enum  (.getPrimitiveTypeName schema)
@@ -55,6 +63,32 @@
   [^Date date]
   (int (.toSeconds TimeUnit/MILLISECONDS (.getTime date))))
 
+
+(defn get-map-schemas
+  "The schema should be a valid hive map and have the format
+   #<GroupType optional group [map-field-name] (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key;\n    optional binary value;\n  }\n}"
+  [^Type schema]
+  (let [map-type (.asGroupType (.getType (.asGroupType schema) "map"))]
+    [(.getType map-type "key") (.getType map-type "value")]))
+
+(defn write-key-value
+  "Write a hive map compatible data structure from the schema {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key;\n    optional binary value;\n  }\n}
+   Note only the key value parts are written, the group and field for map needs to be created before and ended after this function is called for all key values"
+  [rconsumer ^Type schema k v]
+  (let [[^Type key-type ^Type val-type] (get-map-schemas schema)
+        key-name (.getName key-type)
+        val-name (.getName val-type)]
+
+    (start-group rconsumer)
+    (start-field rconsumer key-name 0)
+    (write-val rconsumer key-type k)
+    (end-field rconsumer key-name 0)
+
+    (start-field rconsumer val-name 1)
+    (write-val rconsumer val-type v)
+    (end-field rconsumer val-name 1)
+
+    (end-group rconsumer)))
 
 (defmulti write-extended-val "Any object other than a Java primitive, the dispatch is based on the Type::originalType" (fn [rconsumer ^Type schema val] (.getOriginalType schema)))
 
@@ -86,26 +120,32 @@
   (write-primitive-val rconsumer PrimitiveType$PrimitiveTypeName/INT32 (date->int-seconds val)))
 
 
+(defmethod write-extended-val OriginalType/MAP [rconsumer ^Type schema val]
+  ;;write a hive compatible map type
+  ;;#<GroupType optional group [map-field-name] (MAP) {
+  ;;  repeated group map (MAP_KEY_VALUE) {
+  ;;                                      required binary key;
+  ;;                                               optional binary value;
+  ;;                                      }
+  ;;}
+
+  (check-is-map val)
+  (start-field rconsumer (.getName schema) 0)
+
+  ;;for each key val call write-key-value
+  (reduce-kv #(write-key-value rconsumer schema %2 %3) nil val)
+
+  (end-field rconsumer (.getName schema) 0))
+
+
+
 ;;Default is a Group and the val type must be a Map
 (defmethod write-extended-val :default [rconsumer ^Type schema val]
-  (if-not (instance? Map val)
-    (throw (RuntimeException. (str "Val must be a map but got " val))))
+  (check-is-map val)
 
-  (let [^GroupType type (.asGroupType schema)
-        cnt (.getFieldCount type)]
-        (start-group  rconsumer)
-        (loop [i 0]
-          (when (< i cnt)
-            (let [^Type field (.getType type (int i))
-                  field-name (.getName field)
-                  map-v (get val field-name)]
-              (when (Util/notNilOrEmpty map-v)
-                (start-field rconsumer field-name i)
-                (write-val rconsumer field map-v)
-                (end-field rconsumer field-name i))
-              (recur (inc i)))))
-        (end-group rconsumer)))
-
+  (start-group  rconsumer)
+  (write-message-fields rconsumer (.asGroupType schema) val)
+  (end-group rconsumer))
 
 (defn write-val
   "Write a primitive or extend (List Map) value"
