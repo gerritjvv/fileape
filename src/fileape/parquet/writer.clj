@@ -66,18 +66,3 @@
   {:pre [record-writer]}
   (.close record-writer nil))
 
-
-(defn test-schema []
-  (parse-schema "message AddressBook {
-                                                           required binary name;
-                                                           optional group addresses (LIST) {
-                                                              repeated group bag {
-                                                                optional group array_element {
-                                                                    optional binary country;
-                                                                    optional binary city;
-                                                                 }
-                                                              }
-                                                           }
-
-                                      }"))
-
