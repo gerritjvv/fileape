@@ -49,7 +49,7 @@
   [schema]
   (MessageTypeParser/parseMessageType (str schema)))
 
-(defn open-parquet-file! [^MessageType type file & {:keys [parquet-codec] :or {parquet-codec :snappy} :as conf}]
+(defn open-parquet-file! [^MessageType type file & {:keys [parquet-codec] :or {parquet-codec :gzip} :as conf}]
   (let [file-obj (io/file file)]
     {:record-writer (record-writer conf
                                    type file-obj
