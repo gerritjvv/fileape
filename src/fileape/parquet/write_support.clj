@@ -37,15 +37,23 @@
     (if-not (instance? Map v)
       (throw (RuntimeException. (str "Val must be a map but got " v))))))
 
+(defn as-number [val]
+  (if (number? val) val
+                    (Long/valueOf (str val))))
+
+(defn as-float [val]
+  (if (number? val) val
+                    (Double/valueOf (str val))))
+
 (defn write-primitive-val [^RecordConsumer rconsumer ^PrimitiveType schema val]
   (try
     (case-enum  (.getPrimitiveTypeName schema)
-                PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long val))
-                PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int val))
+                PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long (as-number val)))
+                PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int (as-number val)))
                 PrimitiveType$PrimitiveTypeName/BOOLEAN (.addBoolean rconsumer (boolean val))
                 PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
-                PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float val))
-                PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double val)))
+                PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float (as-float val)))
+                PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double (as-float val))))
     (catch Exception e (throw (ex-info (str e) {:schema schema :val val :val-type (if val (type val) nil)})))))
 
 
