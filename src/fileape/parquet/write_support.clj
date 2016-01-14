@@ -38,13 +38,15 @@
       (throw (RuntimeException. (str "Val must be a map but got " v))))))
 
 (defn write-primitive-val [^RecordConsumer rconsumer ^PrimitiveType schema val]
-  (case-enum  (.getPrimitiveTypeName schema)
-    PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long val))
-    PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int val))
-    PrimitiveType$PrimitiveTypeName/BOOLEAN (.addBoolean rconsumer (boolean val))
-    PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
-    PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float val))
-    PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double val))))
+  (try
+    (case-enum  (.getPrimitiveTypeName schema)
+                PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long val))
+                PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int val))
+                PrimitiveType$PrimitiveTypeName/BOOLEAN (.addBoolean rconsumer (boolean val))
+                PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
+                PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float val))
+                PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double val)))
+    (catch Exception e (throw (ex-info (str e) {:schema schema :val val :val-type (if val (type val) nil)})))))
 
 
 (defn start-field [^RecordConsumer rconsumer ^String field-name ^long i]
