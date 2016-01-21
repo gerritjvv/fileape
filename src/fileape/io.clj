@@ -4,20 +4,13 @@
   fileape.io
   (:require
     [clojure.java.io :refer [make-parents] :as io]
-    [fileape.parquet.writer :as parquet-writer]
-    [clj-tuple :refer [tuple]]
-    [fun-utils.threads :as threads]
     [fun-utils.agent :as fagent]
     [clojure.core.async :as async]
     [clojure.string :as clj-str]
     [fileape.io-plugin :as io-plugin]
     [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
-           (java.io File IOException FileOutputStream BufferedOutputStream OutputStream DataOutputStream)
-           (java.util.zip GZIPOutputStream)
-           (org.xerial.snappy SnappyOutputStream)
-           (java.util.concurrent CountDownLatch)
-           (org.apache.parquet.schema MessageType)))
+           (java.io File IOException)))
 
 
 (defrecord CTX [root-agent roll-ch conf env shutdown-flag])
@@ -108,6 +101,14 @@
         (create-file base-dir codec file-key))
       file)))
 
+(defn do-create-file!
+  "Create the parent directories and run create new file"
+  [base-dir file-key ^File file]
+  (try
+    (make-parents file)
+    (.createNewFile file)
+    (catch Exception e (throw (ex-info (str e) {:cause e :file file :base-dir base-dir :file-key file-key})))))
+
 (defn- create-file-data!
   "Create a file and return a map with keys file codec file-key out,
    out contains the output stream and will always be a DataOutputStream
@@ -121,11 +122,11 @@
   [k {:keys [codec base-dir] :as conf} env file-key]
   (try
     (let [^File file (create-file base-dir codec file-key)]
-      (prn "create file-data " codec)
 
-      (make-parents file)
-      (.createNewFile file)
-      (info "create new file " (.getAbsolutePath file))
+      (info "create new file " codec " " (.getAbsolutePath file))
+
+      (do-create-file! base-dir file-key file)
+
       (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
       (assoc
@@ -148,18 +149,17 @@
 (defn- create-if-not
   "Returns [(agent (delay file-data)) map]"
   [k conf env file-key m]
-  (if-let [o (get m k)] (tuple o m) (let [o (create-agent k conf env file-key)] (tuple o (assoc m k o)))))
+  (if-let [o (get m k)] (vector o m) (let [o (create-agent k conf env file-key)] (vector o (assoc m k o)))))
 
 (defn- write-to-agent!
   "Calls the writer-f via the agent sending it the agents dereferenced result"
-  [ctx writer-f [agnt m :as tpl]]
-  ;@TODO find a better mechanism to not block forever
+  [_ writer-f [agnt :as tpl]]
   (fagent/send agnt (fn [file-desc] (try (writer-f file-desc) (catch Exception e (error e e))) file-desc))
   tpl)
 
 (defn- do-roll!
   "Helper function that calls roll-and-notify"
-  [check-f ctx file-desc]
+  [ctx file-desc]
   (roll-and-notify (:roll-ch ctx) file-desc)
   nil)
 
@@ -172,7 +172,7 @@
                ;agnt is an agent and its value is (delay file-desc)
                (debug "check file for roll " (:file @agnt) " should roll " (check-f @agnt) " close-and-wait " close-and-wait)
                (if (check-f @agnt)
-                 (if (fagent/send agnt (partial do-roll! check-f ctx))
+                 (if (fagent/send agnt (partial do-roll! ctx))
                    (do
                      (fagent/close-agent agnt :wait close-and-wait)
                      (dissoc m k))
