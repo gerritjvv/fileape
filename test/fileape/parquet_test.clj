@@ -26,6 +26,11 @@
     (parquet-util/read-hive-records file)))
 
 
+(defn scrub-data
+  "Helper function to return a single un nested list of string data"
+  [d]
+  (->> d flatten (map str) sort))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;; Def Tests
 
@@ -33,6 +38,6 @@
 (deftest hive-write-test
   (is
     (=
-      (vec (test-write-hive))
-      [[[[["a" "a-2"] ["b" "b-3"] ["c" "c-4"]]] "hi" [1 1] [["1" "2" "3"]]]])))
+      (scrub-data (vec (test-write-hive)))
+      (scrub-data [[[[["a" "a-2"] ["b" "b-3"] ["c" "c-4"]]] "hi" [1 1] [["1" "2" "3"]]]]))))
 

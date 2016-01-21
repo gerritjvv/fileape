@@ -21,7 +21,7 @@
                   [org.clojure/tools.logging "0.3.1"]
                   [log4j "1.2.16"]
                   [org.xerial.snappy/snappy-java "1.1.0"]
-                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
+                  [org.clojure/core.async "0.2.374"]
 
                   [org.apache.parquet/parquet-common "1.8.1"]
                   [org.apache.parquet/parquet-encoding "1.8.1"]
@@ -29,7 +29,7 @@
                   [org.apache.parquet/parquet-hadoop "1.8.1"]
 
                   [org.apache.hadoop/hadoop-core "0.20.2" :exclusions [hsqldb]]
-                  [org.clojure/clojure "1.5.1"]]
+                  [org.clojure/clojure "1.6.0"]]
 
   :profiles {:dev {:dependencies [[midje "1.6.3"]
                                   [org.apache.parquet/parquet-tools "1.8.1"]
