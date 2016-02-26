@@ -77,11 +77,17 @@
         file2))))
 
 (defn- roll-and-notify
-  "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel"
+  "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel
+   The roll-ch is only sent keys [file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]"
   [roll-ch file-data]
   (when file-data
     (let [file (close-and-roll file-data)]
-      (async/>!! roll-ch (assoc file-data :file file))))
+      (async/>!! roll-ch {:file file
+                          :codec (:codec file-data)
+                          :file-key (:file-key file-data)
+                          :future-file-name (:future-file-name file-data)
+                          :record-count (:record-counter file-data)
+                          :updated (:updated file-data)})))
   file-data)
 
 

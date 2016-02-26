@@ -89,7 +89,7 @@
 
 (defn ape
   "Entrypoint to the api, creates the resources for writing
-   roll-callbacks - on each file roll all functions in this list are called
+   roll-callbacks - on each file roll all functions in this list are called, they are called with a map of keys [file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]
 
    Returns a map with a key :env that can be updated using update-env!, and is used depending on the storage plugins"
   [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks
@@ -100,7 +100,7 @@
                                           use-buffer true} :as ape-conf}]
 
   (let [error-ch (async/chan (async/sliding-buffer 10))
-        roll-ch (async/chan (async/sliding-buffer 100))
+        roll-ch (async/chan (async/sliding-buffer (if (not-empty roll-callbacks) 100 1)))
         env-ref (ref (merge {} env))
         conf
         (merge ape-conf
