@@ -90,9 +90,9 @@
 (defn ape
   "Entrypoint to the api, creates the resources for writing
    roll-callbacks - on each file roll all functions in this list are called, they are called with a map of keys [file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]
-
+   error-handler a function that is called if any errors happen in the writer agens as (error-handler error fn)
    Returns a map with a key :env that can be updated using update-env!, and is used depending on the storage plugins"
-  [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks
+  [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks error-handler
            out-buffer-size use-buffer
            parallel-files
            env] :or {codec :gzip check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 2 rollover-abs-timeout Long/MAX_VALUE
@@ -119,13 +119,22 @@
         ctx (io/create-ctx conf env-ref roll-ch)]
 
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
+    ;;if any error handlers
+    (when error-handler
+      (fun-utils/go-seq
+        (fn [v]
+          (try
+            (apply error-handler v)
+            (catch Exception e (error e e))))
+        error-ch))
+
     ;if any rollbacks
     (when (not-empty roll-callbacks)
       (fun-utils/go-seq
         (fn [v]
           (try
             (->> roll-callbacks (map #(% v)) doall)
-            (catch Exception e (prn e e))))
+            (catch Exception e (error e e))))
         roll-ch))
 
     {:ctx ctx
