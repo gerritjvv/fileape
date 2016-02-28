@@ -225,7 +225,7 @@ To change what other original types can be written use the multimethod in ```fil
 <tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
 <tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
-<tr><td>:parquet-enable-dictionary</td> false<td></td></tr>
+<tr><td>:parquet-enable-dictionary</td>false<td></td></tr>
 
 </table>
 

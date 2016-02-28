@@ -32,7 +32,7 @@
                (Configuration.)
                (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
                (.setLong "parquet.page.size" (get conf :parquet-page-size 1048576))
-               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary true)))
+               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary false)))
 
         path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
         output-format (ParquetOutputFormat. (writer-support/java-write-support schema {}))
