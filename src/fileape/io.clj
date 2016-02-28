@@ -13,19 +13,26 @@
            (java.io File IOException)))
 
 
-(defrecord CTX [root-agent roll-ch conf env shutdown-flag])
+(defrecord CTX [root-agent roll-ch conf env shutdown-flag error-ch])
 
 (defonce default-conf {:codec :gzip :threads 2})
 
-(defn create-ctx [conf env roll-ch]
-  {:pre [conf env roll-ch]}
-  (->CTX (fagent/agent {}) roll-ch (merge default-conf conf) env (AtomicBoolean. false)))
+(defn create-ctx
+  "error-ch is called with [error function-sent-to-agent]"
+  ([conf env roll-ch]
+    (create-ctx conf env roll-ch (async/chan (async/sliding-buffer 1))))
+  ([conf env roll-ch error-ch]
+   {:pre [conf env roll-ch error-ch]}
+   (->CTX (fagent/agent {} :error-handler (fn [e f]
+                                            (error (str e " from " f) e)
+                                            (async/>!! error-ch [e f])))
+          roll-ch (merge default-conf conf) env (AtomicBoolean. false) error-ch)))
 
 
 (defn update-ctx
   "Returns a new CTX with a new config applied, all other values are kept as is"
-  [{:keys [root-agent roll-ch env shutdown-flag]} conf]
-  (->CTX root-agent roll-ch conf env shutdown-flag))
+  [{:keys [root-agent roll-ch env shutdown-flag error-ch]} conf]
+  (->CTX root-agent roll-ch conf env shutdown-flag error-ch))
 
 (defn open? [ctx]
   (not (.get ^AtomicBoolean (:shutdown-flag ctx))))
@@ -126,26 +133,22 @@
   file-key: file key created based on k
   "
   [k {:keys [codec base-dir] :as conf} env file-key]
-  (try
-    (let [^File file (create-file base-dir codec file-key)]
+  (let [^File file (create-file base-dir codec file-key)]
 
-      (info "create new file " codec " " (.getAbsolutePath file))
+    (info "create new file " codec " " (.getAbsolutePath file))
 
-      (do-create-file! base-dir file-key file)
+    (do-create-file! base-dir file-key file)
 
-      (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
+    (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
-      (assoc
-        (get-output k file env conf)
-        :file file
-        :codec codec
-        :file-key file-key
-        :future-file-name (io/file (create-future-file-name file))
-        :record-counter (AtomicLong. 0)
-        :updated (AtomicReference. (System/currentTimeMillis))))
-    (catch Exception e (do
-                         (error e e)
-                         (.printStackTrace e)))))
+    (assoc
+      (get-output k file env conf)
+      :file file
+      :codec codec
+      :file-key file-key
+      :future-file-name (io/file (create-future-file-name file))
+      :record-counter (AtomicLong. 0)
+      :updated (AtomicReference. (System/currentTimeMillis)))))
 
 (defn- create-agent [k conf env file-key]
   ;create an agent with a default mailbox-len of 10
