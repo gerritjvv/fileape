@@ -20,7 +20,7 @@
 (defn create-ctx
   "error-ch is called with [error function-sent-to-agent]"
   ([conf env roll-ch]
-    (create-ctx conf env roll-ch (async/chan (async/sliding-buffer 1))))
+   (create-ctx conf env roll-ch (async/chan (async/sliding-buffer 1))))
   ([conf env roll-ch error-ch]
    {:pre [conf env roll-ch error-ch]}
    (->CTX (fagent/agent {} :error-handler (fn [e f]
@@ -89,12 +89,12 @@
   [roll-ch file-data]
   (when file-data
     (let [file (close-and-roll file-data)]
-      (async/>!! roll-ch {:file file
-                          :codec (:codec file-data)
-                          :file-key (:file-key file-data)
+      (async/>!! roll-ch {:file             file
+                          :codec            (:codec file-data)
+                          :file-key         (:file-key file-data)
                           :future-file-name (:future-file-name file-data)
-                          :record-count (:record-counter file-data)
-                          :updated (:updated file-data)})))
+                          :record-count     (:record-counter file-data)
+                          :updated          (:updated file-data)})))
   file-data)
 
 
@@ -238,7 +238,7 @@
   (try
     (write-to-agent-helper k ctx file-key writer-f m)
     (catch Exception e (do
-                         (info "Retry:  " k " " file-key " " e " tries " tries )
+                         (info "Retry:  " k " " file-key " " e " tries " tries)
 
                          (if (retry? ctx tries)
                            (do
@@ -258,6 +258,17 @@
   (if (open? ctx)
     (fagent/send (:root-agent ctx)
                  #(agent-root-send k ctx file-key writer-f 0 %))
+    (throw (RuntimeException. "The writer context has already been closed"))))
+
+(defn async-write-timeout!
+  "Creates a file based on the key k, the file descriptor is cached so that its only created once
+   The descriptor is passed to the writer-f, and the final state is maintained in the (:state ctx)"
+  [k ctx file-key writer-f timeout]
+  (if (open? ctx)
+    (fagent/send-timeout
+      (:root-agent ctx)
+      #(agent-root-send k ctx file-key writer-f 0 %)
+      timeout)
     (throw (RuntimeException. "The writer context has already been closed"))))
 
 
