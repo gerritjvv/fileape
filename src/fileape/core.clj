@@ -90,34 +90,46 @@
 (defn ape
   "Entrypoint to the api, creates the resources for writing
    roll-callbacks - on each file roll all functions in this list are called, they are called with a map of keys [file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]
-   error-handler a function that is called if any errors happen in the writer agens as (error-handler error fn)
-   Returns a map with a key :env that can be updated using update-env!, and is used depending on the storage plugins"
+   error-handler a function that is called if any errors happen in the writer agents as (error-handler error fn)
+   Returns a map with a key :env that can be updated using update-env!, and is used depending on the storage plugins
+
+   Retries: operations in the root agent i.e create-file and resources are retried (default 3) with a retry-sleep between each retry (default 500ms)
+            it is done so that if file resources are scarce we try our best to wait then retry etc, if we run out of retries the error-handler is called
+            Retries do block the root agent and thus all sending"
   [{:keys [codec base-dir rollover-size rollover-timeout rollover-abs-timeout check-freq roll-callbacks error-handler
            out-buffer-size use-buffer
            parallel-files
-           env] :or {codec :gzip check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 2 rollover-abs-timeout Long/MAX_VALUE
-                                          out-buffer-size 32768 ;32KB
-                                          use-buffer true} :as ape-conf}]
+           retries
+           retry-sleep
+           env] :or {codec           :gzip check-freq 10000 rollover-size 134217728 rollover-timeout 60000 parallel-files 2 rollover-abs-timeout Long/MAX_VALUE
+                     retries         3
+                     retry-sleep     500
+                     out-buffer-size 32768                  ;32KB
+                     use-buffer      true} :as ape-conf}]
+  {:pre [base-dir]}
 
   (let [error-ch (async/chan (async/sliding-buffer 10))
         roll-ch (async/chan (async/sliding-buffer (if (not-empty roll-callbacks) 100 1)))
         env-ref (ref (merge {} env))
         conf
         (merge ape-conf
-               {:codec            codec
-                :base-dir         base-dir
-                :rollover-size    rollover-size
-                :rollover-timeout rollover-timeout
-                :check-freq       check-freq
-                :error-ch         error-ch
-                :parallel-files   parallel-files
+               {:codec                codec
+                :base-dir             base-dir
+                :rollover-size        rollover-size
+                :rollover-timeout     rollover-timeout
+                :check-freq           check-freq
+                :error-ch             error-ch
+                :parallel-files       parallel-files
                 :rollover-abs-timeout rollover-abs-timeout
-                :roll-ch          roll-ch
-                :out-buffer-size out-buffer-size
-                :use-buffer use-buffer
-                :file-data-create (fn [& _])})
+                :roll-ch              roll-ch
+                :out-buffer-size      out-buffer-size
+                :use-buffer           use-buffer
+                :retries              retries
+                :retry-sleep          retry-sleep
+                :file-data-create     (fn [& _])})
         ctx (io/create-ctx conf env-ref roll-ch error-ch)]
 
+    (prn "FUCK base dir " base-dir)
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
     ;;if any error handlers
     (when error-handler
@@ -137,7 +149,7 @@
             (catch Exception e (error e e))))
         roll-ch))
 
-    {:ctx ctx
+    {:ctx          ctx
      :fix-delay-ch (fun-utils/fixdelay-thread check-freq (try
                                                            (io/check-roll! ctx (partial roll-over-check conf))
                                                            (catch Exception e (error e e))))}))

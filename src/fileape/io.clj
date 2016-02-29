@@ -161,9 +161,15 @@
   (if-let [o (get m k)] (vector o m) (let [o (create-agent k conf env file-key)] (vector o (assoc m k o)))))
 
 (defn- write-to-agent!
-  "Calls the writer-f via the agent sending it the agents dereferenced result"
-  [_ writer-f [agnt :as tpl]]
-  (fagent/send agnt (fn [file-desc] (try (writer-f file-desc) (catch Exception e (error e e))) file-desc))
+  "Calls the writer-f via the agent sending it the agents dereferenced result
+   Error-handling: If any errors while envoking writer-f, a call is made to (:error-ch ctx) sending [error writer-f], (error e e) is also called"
+  [ctx writer-f [agnt :as tpl]]
+  {:pre [(:error-ch ctx)]}
+
+  (fagent/send agnt (fn [file-desc] (try (writer-f file-desc) (catch Exception e
+                                                                (do
+                                                                  (error e e)
+                                                                  (async/>!! (:error-ch ctx) [e writer-f])))) file-desc))
   tpl)
 
 (defn- do-roll!
@@ -196,15 +202,62 @@
                #(reducer-roll-if ctx check-f % :close-and-wait close-and-wait)))
 
 
+(defn nth-one [coll]
+  (nth coll 1))
+
+
+(defn write-to-agent-helper
+  "Helper function from agent-root-send-f that does:
+      create-if-not agent
+      write to agent, return result of nth-one"
+  [k ctx file-key writer-f m]
+  (->> m
+       (create-if-not k
+                      (:conf ctx)
+                      (:env ctx)
+                      file-key)
+
+       (write-to-agent! ctx writer-f)
+
+       nth-one))
+
+
+(defn retry? [ctx tries]
+  {:pre [(get-in ctx [:conf :retries])]}
+  (< tries (get-in ctx [:conf :retries])))
+
+(defn retry-sleep! [ctx]
+  {:pre [(get-in ctx [:conf :retry-sleep])]}
+  (Thread/sleep (long (get-in ctx [:conf :retry-sleep]))))
+
+(defn agent-root-send
+  "Called from the root agent
+   Will retry on exception as long as retry? return true
+   otherwise on exception it will call (>!! error-ch [exception writer-f])"
+  [k ctx file-key writer-f tries m]
+  (try
+    (write-to-agent-helper k ctx file-key writer-f m)
+    (catch Exception e (do
+                         (info "Retry:  " k " " file-key " " e " tries " tries )
+
+                         (if (retry? ctx tries)
+                           (do
+                             (retry-sleep! ctx)
+                             (agent-root-send k ctx file-key writer-f (inc tries) m))
+                           (do
+                             ;;it is important that after doing error handling we return m
+                             ;;otherwise the root agent will have a value other than expected e.g boolean(true)
+                             (error e e)
+                             (async/>!! (:error-ch ctx) [e writer-f])
+                             m))))))
+
 (defn async-write!
   "Creates a file based on the key k, the file descriptor is cached so that its only created once
    The descriptor is passed to the writer-f, and the final state is maintained in the (:state ctx)"
   [k ctx file-key writer-f]
   (if (open? ctx)
     (fagent/send (:root-agent ctx)
-                 (comp #(nth % 1)
-                       (comp (partial write-to-agent! ctx writer-f)
-                             (partial create-if-not k (:conf ctx) (:env ctx) file-key))))
+                 #(agent-root-send k ctx file-key writer-f 0 %))
     (throw (RuntimeException. "The writer context has already been closed"))))
 
 
