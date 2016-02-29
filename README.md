@@ -31,7 +31,7 @@ For the function sent to the write function, before version 0.5.0 the argument w
    (prn "File rolled " file))
 
 (def ape2 (ape {:codec :gzip
-		:base-dir "testdir"
+		        :base-dir "testdir"
                 :check-freq 5000
                 :rollover-size 134217728
                 :rollover-timeout 60000
@@ -206,6 +206,24 @@ To change what other original types can be written use the multimethod in ```fil
 (ape/close ape2)
 ```
 
+## Error Handling
+
+File writing is done asynchronously and thus no exceptions will be thrown while calling ```ape/write```.  
+Exceptions are called into an error handler as ```(error-handler exception writer-function)``` here writer-function
+is the function that was sent to the ```ape/write``` function.
+
+```clojure
+(require '[fileape.core :as ape] :reload)
+
+(defn prn-errors [exception f] (prn "Error " exception " f " f))
+(def ape2 (ape/ape {:base-dir "/tmp/testdir" :error-handler prn-errors}))
+
+(ape/write ape2 "test" (fn [_] (throw (RuntimeException. "Test"))))
+
+;; "Error " #<RuntimeException java.lang.RuntimeException: Test> " f " #<user$eval9783$fn__9784 user$eval9783$fn__9784@4194c025>
+
+```
+
 ## Properties
 
 <table border="0">
@@ -217,6 +235,8 @@ To change what other original types can be written use the multimethod in ```fil
 <tr><td>:check-freq</td><td>frequency in milliseconds in which the open files are checked</td></tr>
 <tr><td>:parallel-files</td><td>this is a performance property, for each topic n=parallel-files files will be created.</td></tr>
 <tr><td>:rollover-abs-timeout</td><td>A file is only open rollover-abs-timeout milliseconds, default is Long/MAX_VALUE</td></tr>
+<tr><td>:retries</td><td>Number of retries to do when creating resources associated with the file, default is 3</td></tr>
+<tr><td>:retry-sleep</td><td>The number of milliseconds to sleep between each retry, default 500ms</td></tr>
 </table>
 
 ## Parquet Properties
@@ -225,7 +245,7 @@ To change what other original types can be written use the multimethod in ```fil
 <tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
 <tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
-<tr><td>:parquet-enable-dictionary</td> false<td></td></tr>
+<tr><td>:parquet-enable-dictionary</td>false<td></td></tr>
 
 </table>
 
