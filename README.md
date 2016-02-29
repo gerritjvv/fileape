@@ -31,7 +31,7 @@ For the function sent to the write function, before version 0.5.0 the argument w
    (prn "File rolled " file))
 
 (def ape2 (ape {:codec :gzip
-		:base-dir "testdir"
+		        :base-dir "testdir"
                 :check-freq 5000
                 :rollover-size 134217728
                 :rollover-timeout 60000
