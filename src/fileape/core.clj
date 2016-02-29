@@ -129,7 +129,6 @@
                 :file-data-create     (fn [& _])})
         ctx (io/create-ctx conf env-ref roll-ch error-ch)]
 
-    (prn "FUCK base dir " base-dir)
     (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
     ;;if any error handlers
     (when error-handler
