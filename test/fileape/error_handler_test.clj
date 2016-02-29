@@ -1,7 +1,7 @@
 (ns fileape.error-handler-test
-  (:require [fileape.core :as ape])
-  (:import (java.io File))
-  (:use midje.sweet))
+  (:require [fileape.core :as ape]
+            [midje.sweet :refer :all])
+  (:import (java.io File)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; helper functions
