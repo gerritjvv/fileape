@@ -1,7 +1,7 @@
 (ns fileape.error-handler-test
   (:require [fileape.core :as ape])
   (:import (java.io File))
-  (:use clojure.test))
+  (:use midje.sweet))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;; helper functions
@@ -72,8 +72,8 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;;;; test handles
 
-(deftest test-error-handler-is-called
-  (is (test-receive-errors)))
+(facts "test-error-handler-is-called"
+       (test-receive-errors) => true)
 
-(deftest test-error-handler-is-called-after-retry
-  (is (test-receive-errors)))
+(facts "test-error-handler-is-called-after-retry"
+       (test-receive-errors) => true)

@@ -24,8 +24,9 @@
 
        (fact "test write file"
 
-             (let [write-count (AtomicInteger.)
-                   ape (ape {:codec :gzip})]
+             (let [base-dir (File. "target/tests/write-read-gzip0")
+                   write-count (AtomicInteger.)
+                   ape (ape {:codec :gzip :base-dir base-dir})]
                (write ape "abc-123" (fn [{:keys [^DataOutputStream out]}] (.getAndIncrement write-count)
                                       (.writeInt out (int 1))))
 
