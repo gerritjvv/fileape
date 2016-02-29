@@ -1,4 +1,4 @@
-(defproject fileape "0.8.7"
+(defproject fileape "0.8.8-SNAPSHOT"
   :description "Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip"
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
@@ -17,7 +17,7 @@
 
   :dependencies [
                   ;[org.apache.hadoop/hadoop-common "2.2.0" :scope "provided"]
-                  [fun-utils "0.6.0"]
+                  [fun-utils "0.6.1"]
                   [org.clojure/tools.logging "0.3.1"]
                   [log4j "1.2.16"]
                   [org.xerial.snappy/snappy-java "1.1.0"]

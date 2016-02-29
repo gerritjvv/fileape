@@ -53,6 +53,14 @@
     (fileape.io-plugin/validate-env! k (:env ctx) conf)
     (io/async-write! k ctx (create-parallel-key conf k) f)))
 
+(defn write-timeout
+  "Write with timeout support, if the timeout is reached before a write can start a TimeoutException is thrown"
+  [ape k f timeout]
+  (let [ctx (:ctx ape)
+        conf (:conf ctx)]
+    (fileape.io-plugin/validate-env! k (:env ctx) conf)
+    (io/async-write-timeout! k ctx (create-parallel-key conf k) f timeout)))
+
 (defn close [ape]
   (fun-utils/stop-fixdelay (:fix-delay-ch ape))
   (io/shutdown! (:ctx ape)))
