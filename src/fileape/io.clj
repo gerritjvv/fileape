@@ -93,7 +93,7 @@
                           :codec            (:codec file-data)
                           :file-key         (:file-key file-data)
                           :future-file-name (:future-file-name file-data)
-                          :record-count     (:record-counter file-data)
+                          :record-counter     (:record-counter file-data)
                           :updated          (:updated file-data)})))
   file-data)
 
