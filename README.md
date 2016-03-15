@@ -249,6 +249,14 @@ is the function that was sent to the ```ape/write``` function.
 
 </table>
 
+## Parquet Errors
+
+###  New Memory allocation 1001624 bytes is smaller than the minimum allocation size of 1048576 bytes
+
+Thrown by org.apache.parquet.hadoop.MemoryManager updateAllocation, its not clear to me why this should be
+an exception but in case you get it, lower the :parquet-page-size config.
+
+
 ## License
 
 Distributed under the Eclipse Public License either version 1.0 or (at
