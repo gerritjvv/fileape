@@ -41,7 +41,7 @@
 
 
     (info "parquet writer page.size " (ParquetOutputFormat/getPageSize conf)
-          " block.size " (ParquetOutputFormat/getBlockSize conf)
+          " block.size " (.getLong conf ParquetOutputFormat/BLOCK_SIZE 1048576)
           " memory.min.chunk.size " (.getLong conf ParquetOutputFormat/MIN_MEMORY_ALLOCATION 1048576))
     record-writer))
 
