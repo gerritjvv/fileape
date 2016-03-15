@@ -31,15 +31,18 @@
   (let [conf (doto
                (Configuration.)
                (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
-               (.setInt  "parquet.page.size" (int (get conf :parquet-page-size 1048576)))
-               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary false)))
+               (.setInt "parquet.page.size" (int (get conf :parquet-page-size 1048576)))
+               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary false))
+               (.setLong "parquet.memory.min.chunk.size" (get conf :parquet-memory-min-chunk-size 1048576)))
 
         path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
         output-format (ParquetOutputFormat. (writer-support/java-write-support schema {}))
         record-writer (.getRecordWriter output-format conf path codec)]
 
 
-    (info "parquet writer page.size " (ParquetOutputFormat/getPageSize conf) " block.size " (ParquetOutputFormat/getBlockSize conf))
+    (info "parquet writer page.size " (ParquetOutputFormat/getPageSize conf)
+          " block.size " (ParquetOutputFormat/getBlockSize conf)
+          " memory.min.chunk.size " (.getLong conf ParquetOutputFormat/MIN_MEMORY_ALLOCATION 1048576))
     record-writer))
 
 

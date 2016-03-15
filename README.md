@@ -244,6 +244,7 @@ is the function that was sent to the ```ape/write``` function.
 <tr><td><b>Name</b></td><td><b>Description</b></td></tr>
 <tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
+<tr><td>:parquet-memory-min-chunk-size</td><td>default 1048576, disable with 0</td></tr>
 <tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
 <tr><td>:parquet-enable-dictionary</td>false<td></td></tr>
 
@@ -254,8 +255,7 @@ is the function that was sent to the ```ape/write``` function.
 ###  New Memory allocation 1001624 bytes is smaller than the minimum allocation size of 1048576 bytes
 
 Thrown by org.apache.parquet.hadoop.MemoryManager updateAllocation, its not clear to me why this should be
-an exception but in case you get it, lower the :parquet-page-size config.
-
+an exception but in case you get it, to disable this check set :parquet-memory-min-chunk-size to 0 
 
 ## License
 
