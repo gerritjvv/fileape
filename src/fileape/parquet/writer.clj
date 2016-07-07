@@ -38,6 +38,9 @@
                                                        (.getMethod CodecFactory "getCompressor" (into-array Class [CompressionCodecName Integer/TYPE]))
                                                        (.setAccessible true)))
 
+;;; default memory manager, all record writers will be attached to the same memory managner
+(defonce ^MemoryManager memory-manager (MemoryManager. (float 0.95) 1048576))
+
 ;;; use reflection to get a compressor from the private CodecFactory
 (defn get-compressor [^CodecFactory codec-factory codec page-size]
   (.invoke
@@ -45,8 +48,6 @@
     codec-factory
     (into-array Object [codec (int page-size)])))
 
-;;; default memory manager, all record writers will be attached to the same memory managner
-(defonce ^MemoryManager memory-manager (MemoryManager. (float 0.95) 1048576))
 
 (defn record-writer
   "Create a Parquet Record write that will accept Maps as groups and messages and primitive Java/Clojure types as values"
