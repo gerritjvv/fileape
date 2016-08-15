@@ -64,10 +64,12 @@
 
 
 (defn write! [{:keys [^ParquetRecordWriter record-writer]} msg]
-  (.write record-writer nil msg))
+  (locking record-writer
+    (.write record-writer nil msg)))
 
 
 (defn close! [{:keys [^ParquetRecordWriter record-writer]}]
   {:pre [record-writer]}
-  (.close record-writer nil))
+  (locking record-writer
+    (.close record-writer nil)))
 
