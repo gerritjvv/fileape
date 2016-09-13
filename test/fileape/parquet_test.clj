@@ -5,6 +5,7 @@
 
 
   (:require [fileape.parquet.parquet-util :as parquet-util]
+            [fileape.parquet.writer :as writer]
             [clojure.test :refer :all]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -41,3 +42,9 @@
       (scrub-data (vec (test-write-hive)))
       (scrub-data [[[[["a" "a-2"] ["b" "b-3"] ["c" "c-4"]]] "hi" [1 1] [["1" "2" "3"]]]]))))
 
+
+(deftest corrupt-file-detect-test
+  (is (not (writer/parquet-ok? "test-resources/parquet/corruptdata.parquet"))))
+
+(deftest file-metadata-test
+  (is (writer/parquet-ok? "test-resources/parquet/alltypes_plain.parquet")))

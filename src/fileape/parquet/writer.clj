@@ -17,19 +17,28 @@
     (org.apache.hadoop.fs FileSystem Path)
     (org.apache.hadoop.conf Configuration)
     (org.apache.parquet.schema MessageType MessageTypeParser)
-    (org.apache.parquet.hadoop ParquetOutputFormat ParquetRecordWriter)
+    (org.apache.parquet.hadoop ParquetOutputFormat ParquetRecordWriter ParquetFileReader)
     (java.io File)
-    (org.apache.parquet.hadoop.metadata CompressionCodecName)))
+    (org.apache.parquet.hadoop.metadata CompressionCodecName ParquetMetadata)
+    (org.apache.parquet.format.converter ParquetMetadataConverter ParquetMetadataConverter$NoFilter)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;; Private functions
+
+(defn as-path ^Path [file]
+  (cond
+    (instance? Path file) file
+    (instance? File file) (Path. (.getAbsolutePath ^File file))
+    :else (Path. (str file))))
+
+(defn ^Configuration hadoop-conf [] (Configuration.))
 
 (defn record-writer
   "Create a Parquet Record write that will accept Maps as groups and messages and primitive Java/Clojure types as values"
   [conf ^MessageType schema ^File file ^CompressionCodecName codec]
   (info "record-writer with conf " conf)
   (let [conf (doto
-               (Configuration.)
+               (hadoop-conf)
                (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
                (.setInt "parquet.page.size" (int (get conf :parquet-page-size 1048576)))
                (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary false))
@@ -62,6 +71,23 @@
      :file          file
      :type          type}))
 
+(defn ^ParquetMetadata parquet-metadata
+  "Returns the ParquetMetadata from a file
+   file can be a string, File, or Hadoop Path.
+   Can be used to validate files for correctness also.
+   "
+  [file]
+  (ParquetFileReader/readFooter
+    (hadoop-conf)
+    (as-path file)
+    ParquetMetadataConverter/NO_FILTER))
+
+(defn parquet-ok?
+  "Return nil when the parquet file is corrupt or cannot be read"
+  [file]
+  (try
+    (parquet-metadata file)
+    (catch Exception _ nil)))
 
 (defn write! [{:keys [^ParquetRecordWriter record-writer]} msg]
   (locking record-writer
