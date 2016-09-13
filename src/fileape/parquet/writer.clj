@@ -25,11 +25,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;; Private functions
 
-(defn as-path ^Path [file]
+(defn as-path ^org.apache.hadoop.fs.Path [file]
   (cond
-    (instance? Path file) file
-    (instance? File file) (Path. (.getAbsolutePath ^File file))
-    :else (Path. (str file))))
+    (instance? org.apache.hadoop.fs.Path file) file
+    (instance? File file) (org.apache.hadoop.fs.Path. (.getAbsolutePath ^File file))
+    :else (org.apache.hadoop.fs.Path. (str file))))
 
 (defn ^Configuration hadoop-conf [] (Configuration.))
 
