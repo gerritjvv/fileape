@@ -3,7 +3,7 @@
     :doc    "Basic api for doing async file IO using refs and agents"}
   fileape.io
   (:require
-    [clojure.java.io :refer [make-parents] :as io]
+    [clojure.java.io :as io]
     [fun-utils.agent :as fagent]
     [clojure.core.async :as async]
     [clojure.string :as clj-str]
@@ -98,29 +98,21 @@
   file-data)
 
 
-(defn- ^File create-file
+(defn ^File create-file
   "Create and return a File object with the name based on the file key codec and base dir"
   [base-dir codec file-key]
-  (let [file (File. (io/file (select-base-dir base-dir))
-                    (str file-key
-                         (codec-extension codec)
-                         ;;javadoc for nanoTime says it might return negative values, never seen in practice
-                         ;;to avoid and future/platform proof we do Math/abs
-                         "_" (Math/abs (System/nanoTime))))]
-    ;check that the file does not exist
-    (if (.exists file)
-      (do
-        (Thread/sleep 200)
-        (create-file base-dir codec file-key))
-      file)))
+  (File/createTempFile
+    (str file-key (codec-extension codec) "_"),
+    ""
+    (io/file (select-base-dir base-dir))))
 
 (defn do-create-file!
   "Create the parent directories and run create new file"
-  [base-dir file-key ^File file]
+  [base-dir codec file-key]
   (try
-    (make-parents file)
-    (.createNewFile file)
-    (catch Exception e (throw (ex-info (str e) {:cause e :file file :base-dir base-dir :file-key file-key})))))
+    (.mkdirs (io/file base-dir))
+    (create-file base-dir codec file-key)
+    (catch Exception e (throw (ex-info (str e) {:cause e :base-dir base-dir :file-key file-key})))))
 
 (defn- create-file-data!
   "Create a file and return a map with keys file codec file-key out,
@@ -133,13 +125,13 @@
   file-key: file key created based on k
   "
   [k {:keys [codec base-dir] :as conf} env file-key]
-  (let [^File file (create-file base-dir codec file-key)]
+  (let [^File file (do-create-file! base-dir codec file-key)]
 
     (info "create new file " codec " " (.getAbsolutePath file))
 
-    (do-create-file! base-dir file-key file)
 
-    (if-not (.exists file) (throw (IOException. (str "Failed to create " file))))
+
+    (when-not (.exists file) (throw (IOException. (str "Failed to create " file))))
 
     (assoc
       (get-output k file env conf)
