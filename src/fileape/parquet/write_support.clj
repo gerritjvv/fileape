@@ -54,7 +54,10 @@
                 PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
                 PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float (as-float val)))
                 PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double (as-float val))))
-    (catch Exception e (throw (ex-info (str e) {:schema schema :val val :val-type (if val (type val) nil)})))))
+    (catch Exception e
+      (do
+        (error e (str schema " val " val))
+        (throw (ex-info (str e) {:schema schema :val val :val-type (if val (type val) nil)}))))))
 
 
 (defn start-field [^RecordConsumer rconsumer ^String field-name ^long i]
