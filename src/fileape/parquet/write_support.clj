@@ -7,7 +7,7 @@
             [clojure.tools.logging :refer [error info]])
   (:import (org.apache.parquet.hadoop.api WriteSupport WriteSupport$WriteContext)
            (org.apache.parquet.schema MessageType GroupType OriginalType Type PrimitiveType PrimitiveType$PrimitiveTypeName)
-           (java.util Map Date List)
+           (java.util Map Date List Base64 Base64$Encoder)
            (org.apache.parquet.io.api RecordConsumer Binary)
            (java.util.concurrent TimeUnit)
            (fileape Util)
@@ -25,8 +25,8 @@
 (def BYTE-ARRAY-CLASS (Class/forName "[B"))
 
 (defn asbinary ^"[B" [v]
-  (if (instance? BYTE-ARRAY-CLASS v)
-    (Binary/fromConstantByteArray ^"[B" v)
+  (if (instance? BYTE-ARRAY-CLASS v)                        ;;convert to base 64 instead of a string
+    (Binary/fromString (.encodeToString ^Base64$Encoder  (Base64/getEncoder) (bytes v))) ;(Binary/fromConstantByteArray ^"[B" v)
     (Binary/fromString (str v))))
 
 
