@@ -4,7 +4,7 @@
           done via multimethods while the actual WriterSupport is reified"}
   fileape.parquet.write-support
   (:require [fileape.util.lang :refer [case-enum]]
-            [clojure.tools.logging :refer [error info]])
+            [clojure.tools.logging :refer [error info warn]])
   (:import (org.apache.parquet.hadoop.api WriteSupport WriteSupport$WriteContext)
            (org.apache.parquet.schema MessageType GroupType OriginalType Type PrimitiveType PrimitiveType$PrimitiveTypeName)
            (java.util Map Date List Base64 Base64$Encoder)
@@ -49,18 +49,18 @@
   `(try
      ~@body
     (catch Exception e# (do
-                         (error e#)
+                         (warn (str "exception while parsing value " e# " using default instead " ~default))
                          ~default))))
 
 (defn write-primitive-val [^RecordConsumer rconsumer ^PrimitiveType schema val]
   (try
     (case-enum  (.getPrimitiveTypeName schema)
-                PrimitiveType$PrimitiveTypeName/INT64  (with-default -1 (.addLong rconsumer (long (as-number val))))
-                PrimitiveType$PrimitiveTypeName/INT32   (with-default -1 (.addInteger rconsumer (int (as-number val))))
-                PrimitiveType$PrimitiveTypeName/BOOLEAN (with-default false (.addBoolean rconsumer (boolean val)))
-                PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
-                PrimitiveType$PrimitiveTypeName/FLOAT   (with-default -1 (.addFloat rconsumer (float (as-float val))))
-                PrimitiveType$PrimitiveTypeName/DOUBLE  (with-default -1 (.addDouble rconsumer (double (as-float val)))))
+                PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long (with-default -1 (as-number val))))
+                PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int (with-default -1 (as-number val))))
+                PrimitiveType$PrimitiveTypeName/BOOLEAN (.addBoolean rconsumer (with-default false (boolean val)))
+                PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (with-default (byte-array [-1]) (asbinary val)))
+                PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float (with-default -1 (as-float val))))
+                PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double (with-default -1 (as-float val)))))
     (catch Exception e
       (do
         (error e (str schema " val " val))
