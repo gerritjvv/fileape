@@ -45,15 +45,22 @@
   (if (number? val) val
                     (Double/valueOf (str val))))
 
+(defmacro with-default [default & body]
+  `(try
+     ~@body
+    (catch Exception e# (do
+                         (error e#)
+                         ~default))))
+
 (defn write-primitive-val [^RecordConsumer rconsumer ^PrimitiveType schema val]
   (try
     (case-enum  (.getPrimitiveTypeName schema)
-                PrimitiveType$PrimitiveTypeName/INT64  (.addLong rconsumer (long (as-number val)))
-                PrimitiveType$PrimitiveTypeName/INT32   (.addInteger rconsumer (int (as-number val)))
-                PrimitiveType$PrimitiveTypeName/BOOLEAN (.addBoolean rconsumer (boolean val))
+                PrimitiveType$PrimitiveTypeName/INT64  (with-default -1 (.addLong rconsumer (long (as-number val))))
+                PrimitiveType$PrimitiveTypeName/INT32   (with-default -1 (.addInteger rconsumer (int (as-number val))))
+                PrimitiveType$PrimitiveTypeName/BOOLEAN (with-default false (.addBoolean rconsumer (boolean val)))
                 PrimitiveType$PrimitiveTypeName/BINARY  (.addBinary rconsumer (asbinary val))
-                PrimitiveType$PrimitiveTypeName/FLOAT   (.addFloat rconsumer (float (as-float val)))
-                PrimitiveType$PrimitiveTypeName/DOUBLE  (.addDouble rconsumer (double (as-float val))))
+                PrimitiveType$PrimitiveTypeName/FLOAT   (with-default -1 (.addFloat rconsumer (float (as-float val))))
+                PrimitiveType$PrimitiveTypeName/DOUBLE  (with-default -1 (.addDouble rconsumer (double (as-float val)))))
     (catch Exception e
       (do
         (error e (str schema " val " val))
