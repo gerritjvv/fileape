@@ -1,4 +1,4 @@
-(defproject fileape "0.10.5"
+(defproject fileape "1.0.0"
   :description "Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip"
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
@@ -12,7 +12,7 @@
         :url "https://github.com/gerritjvv/fileape.git"}
 
   :jvm-opts ["-Djava.library.path=/opt/hadoopgpl/native/Linux-amd64-64/"]
-  :javac-options ["-target" "1.6" "-source" "1.6" "-Xlint:-options"]
+  :javac-options ["-target" "1.8" "-source" "1.8" "-Xlint:-options"]
   :java-source-paths ["java"]
 
   :dependencies [

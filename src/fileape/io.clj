@@ -10,7 +10,9 @@
     [fileape.io-plugin :as io-plugin]
     [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
-           (java.io File IOException)))
+           (java.io File IOException)
+           (org.apache.commons.io FileUtils)
+           (java.nio.file Files CopyOption StandardCopyOption)))
 
 
 (defrecord CTX [root-agent roll-ch conf env shutdown-flag error-ch])
@@ -68,6 +70,18 @@
     (rand-nth base-dir)
     base-dir))
 
+(defn move-file [^File source-file ^File dest-file]
+  (try
+    ;;try our best to do an atomic rename to avoid partial move files being seen, but this is platform dependant
+    (Files/move (.toPath source-file) (.toPath dest-file) (into-array CopyOption [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/COPY_ATTRIBUTES]))
+    (catch Exception e
+      (do
+        (debug e (str "Error while moving " source-file " to " dest-file))
+        (FileUtils/moveFile source-file dest-file))            ;note: rename is platform dependant and might not even be atomic, causing
+                                                            ;other processes to see the file and then fail on file doens't exist, or see
+                                                            ;only parts of the file. Using move here ensures to move has happened.
+      )))
+
 (defn- close-and-roll
   "Close the output stream and rename the file by removing the last _[number] suffix"
   [{:keys [file future-file-name] :as file-data}]
@@ -80,7 +94,8 @@
                             (info "choosing new future file name " new-name " from " future-file-name)
                             new-name))]
         (info "close and roll " file " to " file2)
-        (.renameTo (io/file file) file2)
+
+        (move-file file (io/file file2))
         file2))))
 
 (defn- roll-and-notify
@@ -93,7 +108,7 @@
                           :codec            (:codec file-data)
                           :file-key         (:file-key file-data)
                           :future-file-name (:future-file-name file-data)
-                          :record-counter     (:record-counter file-data)
+                          :record-counter   (:record-counter file-data)
                           :updated          (:updated file-data)})))
   file-data)
 
