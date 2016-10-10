@@ -10,7 +10,8 @@
     [fileape.io-plugin :as io-plugin]
     [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
-           (java.io File IOException)))
+           (java.io File IOException)
+           (org.apache.commons.io FileUtils)))
 
 
 (defrecord CTX [root-agent roll-ch conf env shutdown-flag error-ch])
@@ -80,7 +81,10 @@
                             (info "choosing new future file name " new-name " from " future-file-name)
                             new-name))]
         (info "close and roll " file " to " file2)
-        (.renameTo (io/file file) file2)
+
+        (FileUtils/moveFile (io/file file) file2)           ;note: rename is platform dependant and might not even be atomic, causing
+                                                            ;other processes to see the file and then fail on file doens't exist, or see
+                                                            ;only parts of the file. Using move here ensures to move has happened.
         file2))))
 
 (defn- roll-and-notify

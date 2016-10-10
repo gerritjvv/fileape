@@ -94,8 +94,9 @@
     (.write record-writer nil msg)))
 
 
-(defn close! [{:keys [^ParquetRecordWriter record-writer]}]
+(defn close! [{:keys [^ParquetRecordWriter record-writer ^File file]}]
   {:pre [record-writer]}
   (locking record-writer
-    (.close record-writer nil)))
+    (.close record-writer nil)
+    (.)))
 
