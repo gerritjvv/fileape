@@ -260,14 +260,15 @@ sees the file, passes it into another process, and this last process throws an e
 even worse I've seen files that are markes as corrupt then when I run the same command again they are fine, this suggests that the file rename/move is still being
 performed but the file is available for reading. Note all this was seen while using java io File.renameTo.
 
-FileApe uses the commons FileUtils to ensure at least the file is properly moved, but can not solve the issue at hand i.e moves/renames are not atomic.  Although using
-FileUtils it is possible that the whole file could be copied now.
+The fileape.io package uses ```(Files/move (.toPath source-file) (.toPath dest-file) (into-array CopyOption [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/COPY_ATTRIBUTES]))```
+to try and do an atomic move, BUT if the filesystem doesn't support ```ATOMIC_MOVE``` and exception is thrown and the api falls back to the commons FileUtils to ensure at least
+the file is properly moved, but can not solve the issue at hand i.e moves/renames are not atomic.  Although using FileUtils it is possible that the whole file could be copied now,
+thus allowing other application to again see a file partially.
 
 Use of FileLocks:  I don't think File Locks will solve the issue here as it is also just advisory and very much platform dependent.
 
-Solution: Either read files that are a few seconds old, or better yet, have a mechanism (like with parquet files) to check if the file is valid, if invalid retry the check
-to some kind of timeout.
-
+If you're filesystem doesn't provide aotmic moves then either read files that are a few seconds old, or better yet,
+have a mechanism (like with parquet files) to check if the file is valid, if invalid retry the check to some kind of timeout.
 
 ## Parquet Errors
 
