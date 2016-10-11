@@ -14,7 +14,9 @@ on a timeout or size.
 
 ### Java Version
 
-Depends on java 1.7
+As of version ```1.0.0``` depends on java 1.8
+
+Pre ```1.0.0``` depends on java 1.7
 
 ### Version compatibility
 
