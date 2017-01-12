@@ -23,7 +23,8 @@
     [clojure.core.async :as async]
     [fun-utils.core :as fun-utils]
     [clojure.tools.logging :refer [info error]]
-    [fileape.util.io-util :as io-util])
+    [fileape.util.io-util :as io-util]
+    [fileape.conf :as aconf])
   (:import (java.util.concurrent ThreadLocalRandom)
            (java.io File)
            (java.util.concurrent.atomic AtomicReference)))
@@ -38,10 +39,15 @@
 (defn- create-parallel-key
   "Create a key name that is based on file-key + rand[0 - parallel-files]"
   [{:keys [parallel-files]} file-key]
-  (str file-key "." (th-rand-int parallel-files)))
+  (str (name file-key) "." (th-rand-int parallel-files)))
 
-(defn roll-over-check [{:keys [rollover-size rollover-timeout rollover-abs-timeout]} {:keys [^File file ^AtomicReference updated]}]
-  (let [tm-diff (- (System/currentTimeMillis) (.get updated))]
+(defn roll-over-check [conf {:keys [k ^File file ^AtomicReference updated]}]
+  {:pre [k file updated]}
+  (let [rollover-size (aconf/get-conf k conf :rollover-size)
+        rollover-timeout (aconf/get-conf k conf :rollover-timeout)
+        rollover-abs-timeout (aconf/get-conf k conf :rollover-abs-timeout)
+        tm-diff (- (System/currentTimeMillis) (.get updated))]
+
     (or (and (pos? (.length file)) (>= (.length file) rollover-size))
         (>= tm-diff rollover-timeout)
         (>= tm-diff rollover-abs-timeout))))
@@ -137,7 +143,7 @@
                 :file-data-create     (fn [& _])})
         ctx (io/create-ctx conf env-ref roll-ch error-ch)]
 
-    (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
+    (info "start file check " check-freq " rollover-size " rollover-size " rollover-timeout " rollover-timeout)
     ;;if any error handlers
     (when error-handler
       (fun-utils/go-seq

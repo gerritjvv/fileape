@@ -104,10 +104,10 @@
 (defn with-parquet-writer
   "Open a parquet writer using the schema and write msgs to it
    Return the records using dir->parquet-records"
-  [schema msg]
+  [k schema msg]
   (let [test-dir (str "target/tests/parquet-test-" (System/nanoTime))
         file (io/file (str  test-dir "/myfile.parquet"))
-        writer (pwriter/open-parquet-file! schema file :parquet-codec :uncompressed)]
+        writer (pwriter/open-parquet-file! k schema file :parquet-codec :uncompressed)]
 
     (pwriter/write! writer msg)
     (pwriter/close! writer)

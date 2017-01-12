@@ -2,7 +2,7 @@
   ^{:doc
     "Support writing parquet files
      Usage:
-       (def pf (open-parquet-file! (parse-schema \"message test{ required binary name; repeated int32 age;}\") fname))
+       (def pf (open-parquet-file! k (parse-schema \"message test{ required binary name; repeated int32 age;}\") fname))
        (write! pf {\"name\" \"hi\" \"age\" [1 2 3]})
        (close! pf)
 
@@ -12,6 +12,7 @@
     [clojure.string :as string]
     [clojure.tools.logging :refer [info]]
     [clojure.java.io :as io]
+    [fileape.conf :as aconf]
     [fileape.parquet.write-support :as writer-support])
   (:import
     (org.apache.hadoop.fs FileSystem Path)
@@ -35,23 +36,23 @@
 
 (defn record-writer
   "Create a Parquet Record write that will accept Maps as groups and messages and primitive Java/Clojure types as values"
-  [conf ^MessageType schema ^File file ^CompressionCodecName codec]
+  [k conf ^MessageType schema ^File file ^CompressionCodecName codec]
   (info "record-writer with conf " conf)
-  (let [conf (doto
+  (let [hconf (doto
                (hadoop-conf)
-               (.setLong "parquet.block.size" (get conf :parquet-block-size 52428800))
-               (.setInt "parquet.page.size" (int (get conf :parquet-page-size 1048576)))
-               (.setBoolean "parquet.enable.dictionary" (get conf :parquet-enable-dictionary false))
-               (.setLong "parquet.memory.min.chunk.size" (get conf :parquet-memory-min-chunk-size 1048576)))
+               (.setLong "parquet.block.size" (aconf/get-conf k conf :parquet-block-size 52428800))
+               (.setInt "parquet.page.size" (int (aconf/get-conf k conf :parquet-page-size 1048576)))
+               (.setBoolean "parquet.enable.dictionary" (aconf/get-conf k conf :parquet-enable-dictionary false))
+               (.setLong "parquet.memory.min.chunk.size" (aconf/get-conf k conf :parquet-memory-min-chunk-size 1048576)))
 
-        path (.makeQualified (FileSystem/getLocal conf) (Path. (.getAbsolutePath file)))
+        path (.makeQualified (FileSystem/getLocal hconf) (Path. (.getAbsolutePath file)))
         output-format (ParquetOutputFormat. (writer-support/java-write-support schema {}))
-        record-writer (.getRecordWriter output-format conf path codec)]
+        record-writer (.getRecordWriter output-format hconf path codec)]
 
 
-    (info "parquet writer page.size " (ParquetOutputFormat/getPageSize conf)
-          " block.size " (.getLong conf ParquetOutputFormat/BLOCK_SIZE 1048576)
-          " memory.min.chunk.size " (.getLong conf ParquetOutputFormat/MIN_MEMORY_ALLOCATION 1048576))
+    (info "parquet writer page.size " (ParquetOutputFormat/getPageSize hconf)
+          " block.size " (.getLong hconf ParquetOutputFormat/BLOCK_SIZE 1048576)
+          " memory.min.chunk.size " (.getLong hconf ParquetOutputFormat/MIN_MEMORY_ALLOCATION 1048576))
     record-writer))
 
 
@@ -63,9 +64,12 @@
   [schema]
   (MessageTypeParser/parseMessageType (str schema)))
 
-(defn open-parquet-file! [^MessageType type file & {:keys [parquet-codec] :or {parquet-codec :gzip} :as conf}]
-  (let [file-obj (io/file file)]
-    {:record-writer (record-writer conf
+(defn open-parquet-file! [k ^MessageType type file & conf]
+  (let [parquet-codec (aconf/get-conf k (apply array-map conf) :parquet-codec :gzip)
+
+        file-obj (io/file file)]
+    {:record-writer (record-writer k
+                                   conf
                                    type file-obj
                                    (CompressionCodecName/valueOf CompressionCodecName (string/upper-case (name parquet-codec))))
      :file          file
