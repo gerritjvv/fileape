@@ -19,7 +19,8 @@
 
 
 (defn test-write-hive []
-  (let [file (parquet-util/with-parquet-writer (test-schema-hive-1)
+  (let [file (parquet-util/with-parquet-writer "test"
+                                               (test-schema-hive-1)
                                                {"name" "hi"
                                                 "info" {"age" 1 "id" 1}
                                                 "visitordates" ["1" "2" "3"]

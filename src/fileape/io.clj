@@ -7,6 +7,7 @@
     [fun-utils.agent :as fagent]
     [clojure.core.async :as async]
     [clojure.string :as clj-str]
+    [fileape.conf :as aconf]
     [fileape.io-plugin :as io-plugin]
     [clojure.tools.logging :refer [info error debug]])
   (:import (java.util.concurrent.atomic AtomicReference AtomicLong AtomicBoolean)
@@ -100,11 +101,12 @@
 
 (defn- roll-and-notify
   "Calls close-and-roll, then removes from file-map, and then notifies the roll-ch channel
-   The roll-ch is only sent keys [file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]"
+   The roll-ch is only sent keys [k file codec file-key future-file-name ^AtomicLong record-count ^AtomicReference(long) updated]"
   [roll-ch file-data]
   (when file-data
     (let [file (close-and-roll file-data)]
-      (async/>!! roll-ch {:file             file
+      (async/>!! roll-ch {:k (:k file-data)
+                          :file             file
                           :codec            (:codec file-data)
                           :file-key         (:file-key file-data)
                           :future-file-name (:future-file-name file-data)
@@ -132,15 +134,25 @@
 (defn- create-file-data!
   "Create a file and return a map with keys file codec file-key out,
    out contains the output stream and will always be a DataOutputStream
-  Keys returned are: file, codec, file-key
+  Keys returned are:
+    file,
+    codec,
+    file-key,
+    future-file-name,
+    record-counter,
+    updated,
+    k
 
   k: the key/topic provided on write
   conf: configuration while the ape context was created
   env: io plugin environment ref
   file-key: file key created based on k
   "
-  [k {:keys [codec base-dir] :as conf} env file-key]
-  (let [^File file (do-create-file! base-dir codec file-key)]
+  [k conf env file-key]
+  (let [codec (aconf/get-conf k conf :codec)
+        base-dir (aconf/get-conf k conf :base-dir)
+
+        ^File file (do-create-file! base-dir codec file-key)]
 
     (info "create new file " codec " " (.getAbsolutePath file))
 
@@ -150,6 +162,7 @@
 
     (assoc
       (get-output k file env conf)
+      :k k
       :file file
       :codec codec
       :file-key file-key
@@ -159,7 +172,8 @@
 
 (defn- create-agent [k conf env file-key]
   ;create an agent with a default mailbox-len of 10
-  (fagent/agent (create-file-data! k conf env file-key) :mailbox-len 10))
+  (fagent/agent (create-file-data! k conf env file-key) :mailbox-len 10 :error-handler (fn [e f]
+                                                                                         (error (str e " from " f) e))))
 
 
 (defn- create-if-not
@@ -281,5 +295,7 @@
 
 (defn shutdown! [ctx]
   (.set ^AtomicBoolean (:shutdown-flag ctx) true)
+
   (check-roll! ctx (fn [& _] true) :close-and-wait true)
+
   (fagent/close-agent (:root-agent ctx) :wait true))

@@ -73,8 +73,7 @@
 
          (fact "Test Services rollover timeout"
                (let [base-dir (File. "target/tests/write-test-rollover-timeout")
-                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 200})
-                     start (System/currentTimeMillis)]
+                     ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 1000 :rollover-timeout 200})]
 
                  (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
 
@@ -92,9 +91,7 @@
                (let [base-dir (File. "target/tests/write-test-rollover-size")
                      ape2 (ape {:codec :gzip :base-dir base-dir :check-freq 5000 :rollover-size 100})
                      bts-1mb (.getBytes (apply str (take 1048576 (repeatedly (fn [] "a")))))
-                     bts-len (count bts-1mb)
-
-                     start (System/currentTimeMillis)]
+                     bts-len (count bts-1mb)]
 
                  (doall (map #(clojure.java.io/delete-file % :silently) (file-seq base-dir)))
 

@@ -44,8 +44,12 @@
     (validate-parquet-conf! env-key @env entry)
     ;delete the file because the parquet open file will create it and fail if the file exists
     (.delete ^File (clojure.java.io/file file))
-    (apply parquet-writer/open-parquet-file! message-type file :codec parquet-codec
-                                                               (mapcat identity conf))))
+    (apply parquet-writer/open-parquet-file!
+           k
+           message-type
+           file
+           :codec parquet-codec
+           (mapcat identity conf))))
 
 (defn close-parquet-file! [parquet]
   (parquet-writer/close! parquet))
