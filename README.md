@@ -247,9 +247,29 @@ is the function that was sent to the ```ape/write``` function.
 <tr><td>:parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
 <tr><td>:parquet-memory-min-chunk-size</td><td>default 1048576, disable with 0</td></tr>
-<tr><td>parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
+<tr><td>:parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
 <tr><td>:parquet-enable-dictionary</td>false<td></td></tr>
 
+</table>
+
+### Per Key Configuration
+
+Configuration can be overwritten for specific keys passed into ```write```, while the default top level configuration
+applies for other keys.
+
+The following properties can be configured, example used for k = :mytopic, the key passed into ```write``` can be
+either a string, symbol or keyword, all would map to :mytopic.
+
+<table>
+<tr><td>:mytopic.codec</td></tr>
+<tr><td>:mytopic.base-dir</td></tr>
+<tr><td>:mytopic.rollover-size</td></tr>
+<tr><td>:mytopic.rollover-timeout</td></tr>
+<tr><td>:mytopic.parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
+<tr><td>:mytopic.parquet-page-size</td><td>1048576</td></tr>
+<tr><td>:mytopic.parquet-memory-min-chunk-size</td><td>default 1048576, disable with 0</td></tr>
+<tr><td>:mytopic.parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
+<tr><td>:mytopic.parquet-enable-dictionary</td>false<td></td></tr>
 </table>
 
 ## Common File Issues
