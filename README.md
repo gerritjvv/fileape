@@ -248,7 +248,7 @@ is the function that was sent to the ```ape/write``` function.
 <tr><td>:parquet-page-size</td><td>1048576</td></tr>
 <tr><td>:parquet-memory-min-chunk-size</td><td>default 1048576, disable with 0</td></tr>
 <tr><td>:parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
-<tr><td>:parquet-enable-dictionary</td>false<td></td></tr>
+<tr><td>:parquet-enable-dictionary</td><td>false</td></tr>
 
 </table>
 
@@ -265,11 +265,11 @@ either a string, symbol or keyword, all would map to :mytopic.
 <tr><td>:mytopic.base-dir</td></tr>
 <tr><td>:mytopic.rollover-size</td></tr>
 <tr><td>:mytopic.rollover-timeout</td></tr>
-<tr><td>:mytopic.parquet-block-size</td><td>136314880, the bigger this value the more memory is used</td></tr>
-<tr><td>:mytopic.parquet-page-size</td><td>1048576</td></tr>
-<tr><td>:mytopic.parquet-memory-min-chunk-size</td><td>default 1048576, disable with 0</td></tr>
-<tr><td>:mytopic.parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
-<tr><td>:mytopic.parquet-enable-dictionary</td>false<td></td></tr>
+<tr><td>:mytopic.parquet-block-size</td></tr>
+<tr><td>:mytopic.parquet-page-size</td></tr>
+<tr><td>:mytopic.parquet-memory-min-chunk-size</td></tr>
+<tr><td>:mytopic.parquet-codec</td></tr>
+<tr><td>:mytopic.parquet-enable-dictionary</td></tr>
 </table>
 
 ## Common File Issues
