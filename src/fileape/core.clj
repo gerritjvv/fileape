@@ -143,7 +143,7 @@
                 :file-data-create     (fn [& _])})
         ctx (io/create-ctx conf env-ref roll-ch error-ch)]
 
-    (info "start file check " check-freq " rollover-sise " rollover-size " rollover-timeout " rollover-timeout)
+    (info "start file check " check-freq " rollover-size " rollover-size " rollover-timeout " rollover-timeout)
     ;;if any error handlers
     (when error-handler
       (fun-utils/go-seq
