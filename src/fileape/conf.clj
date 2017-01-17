@@ -9,6 +9,8 @@
   (:require [clojure.tools.logging :refer [debug]]))
 
 
+(defn parse-topic [{:keys [env-key-parser] :or {env-key-parser identity}} topic]
+  (env-key-parser topic))
 
 (defn get-conf
   ([conf k]
@@ -16,7 +18,9 @@
   ([topic conf k]
     (get-conf topic conf k nil))
   ([topic conf k default-v]
-    (let [kw-k (keyword (str (name topic) "." (name k)))]
+   (debug "conf " conf)
+
+    (let [kw-k (keyword (str (name (parse-topic conf topic)) "." (name k)))]
       (if-let [v (get conf kw-k)]
         (do
           (debug "get-conf " kw-k " => " v)
