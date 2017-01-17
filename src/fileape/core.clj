@@ -22,7 +22,7 @@
     [fileape.io :as io]
     [clojure.core.async :as async]
     [fun-utils.core :as fun-utils]
-    [clojure.tools.logging :refer [info error]]
+    [clojure.tools.logging :refer [info error debug]]
     [fileape.util.io-util :as io-util]
     [fileape.conf :as aconf])
   (:import (java.util.concurrent ThreadLocalRandom)
@@ -47,6 +47,10 @@
         rollover-timeout (aconf/get-conf k conf :rollover-timeout)
         rollover-abs-timeout (aconf/get-conf k conf :rollover-abs-timeout)
         tm-diff (- (System/currentTimeMillis) (.get updated))]
+
+    (debug "roll-over-check " file " 1: .length file >= rollover-size => " (.length file) " " rollover-size " == " (>= (.length file) rollover-size))
+    (debug "roll-over-check " file " 2: tm-diff >= rollover-timeout => " tm-diff " " rollover-timeout " == " (>= tm-diff rollover-timeout))
+    (debug "roll-over-check " file " 2: tm-diff >= rollover-abs-timeout => " tm-diff " " rollover-abs-timeout " == " (>= tm-diff rollover-abs-timeout))
 
     (or (and (pos? (.length file)) (>= (.length file) rollover-size))
         (>= tm-diff rollover-timeout)

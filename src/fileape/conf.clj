@@ -5,7 +5,8 @@
           e.g :base-dir
           default is :base-dir, but for key :a doing :a.base-dir can override it.
           "}
-  fileape.conf)
+  fileape.conf
+  (:require [clojure.tools.logging :refer [debug]]))
 
 
 
@@ -15,8 +16,13 @@
   ([topic conf k]
     (get-conf topic conf k nil))
   ([topic conf k default-v]
-    (if-let [v (get conf (keyword (str (name topic) "." (name k))))]
-      v
-      (get conf k default-v))))
+    (let [kw-k (keyword (str (name topic) "." (name k)))]
+      (if-let [v (get conf kw-k)]
+        (do
+          (debug "get-conf " kw-k " => " v)
+          v)
+        (let [v (get conf k default-v)]
+          (debug "get-conf specific conf for " kw-k " not found using global config " k " => " v)
+          v)))))
 
 
