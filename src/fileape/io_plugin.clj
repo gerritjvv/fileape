@@ -5,7 +5,9 @@
   (:require [fileape.util.io-util :as io-util]
             [fileape.conf :as aconf]
             [fileape.native-gzip :as native-gzip]
-            [fileape.bzip2 :as bzip2])
+            [fileape.bzip2 :as bzip2]
+            [fileape.avro.writer :as avro-writer]
+            [clojure.string :as string])
   (:import (java.io OutputStream)))
 
 
@@ -25,9 +27,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;; Private Defaults and specific implementations for multi methods
 
+(defn parse-key-remove-dates
+  "For cache lookups keys with dates should be parsed to remove the date value
+   as this is almost always not wanted e.g mylog-[date] for a schema lookup in avro should be mylog"
+  [k]
+  (string/replace k #"[\-0-9]{2,3}" ""))
+
 (defmethod create-plugin :parquet [k file env conf]
   {:parquet (io-util/open-parquet-file! k file env conf)})
 
+(defmethod create-plugin :avro [k file env {:keys [env-key-parser] :or {env-key-parser parse-key-remove-dates} :as conf}]
+  {:avro (avro-writer/open-avro-file! (env-key-parser k) file env conf)})
 
 (defmethod create-plugin :default [k file _ conf]
   (let [codec (aconf/get-conf k conf :codec :gzip)
@@ -57,6 +67,7 @@
     (= codec :bzip2) ".bz2"
     (= codec :none) ".none"
     (= codec :parquet) ".parquet"
+    (= codec :avro) ".avro"
     :else
     (throw (RuntimeException. (str "The codec " codec " is not supported yet")))))
 
@@ -64,6 +75,10 @@
 (defmethod close-plugin :parquet [{:keys [parquet]}]
   (when parquet
     (io-util/close-parquet-file! parquet)))
+
+(defmethod close-plugin :avro [{:keys [avro]}]
+  (when avro
+    (avro-writer/close! avro)))
 
 (defmethod close-plugin :default [{:keys [out]}]
   (when out
@@ -79,7 +94,7 @@
 (defmethod update-env! :default [& _])
 
 
-(defmethod validate-env! :parquet [k env {:keys [env-key-parser] :or {env-key-parser identity}}]
+(defmethod validate-env! :parquet [k env {:keys [env-key-parser] :or {env-key-parser parse-key-remove-dates}}]
   (let [env-key (env-key-parser k)]
     (io-util/validate-parquet-conf! env-key @env (get @env env-key))))
 

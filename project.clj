@@ -1,4 +1,4 @@
-(defproject fileape "1.2.0-SNAPSHOT"
+(defproject fileape "2.0.0-SNAPSHOT"
   :description "Write data to files split by topic and rolled over on size or a timeout, files can be compressed using lzo, snappy or gzip"
   :url "https://github.com/gerritjvv/fileape"
   :license {:name "Eclipse Public License"
@@ -23,6 +23,9 @@
                   [org.xerial.snappy/snappy-java "1.1.0"]
                   [org.clojure/core.async "0.2.374"]
 
+                  [org.apache.avro/avro "1.8.1"]
+                  [io.confluent/kafka-schema-registry-client "2.0.1"]
+
                   [org.apache.parquet/parquet-common "1.8.1"]
                   [org.apache.parquet/parquet-encoding "1.8.1"]
                   [org.apache.parquet/parquet-column "1.8.1"]
@@ -35,6 +38,9 @@
                                   [org.apache.parquet/parquet-tools "1.8.1"]
 
                                   [org.apache.parquet/parquet-hive-storage-handler "1.8.1"]
+
+
+
                                   [org.apache.hive/hive-serde "0.12.0"
                                    :exclusions [hive-exec
                                                 org.codehaus.jackson/jackson-xc
@@ -51,4 +57,7 @@
                              [jonase/eastwood "0.2.1"]
                              [lein-codox "0.9.0"]]}}
 
-  :repositories [["cloudera" "https://repository.cloudera.com/artifactory/cloudera-repos/"]])
+  :repositories [
+                 ["cloudera" "https://repository.cloudera.com/artifactory/cloudera-repos/"]
+                 ["confluent" "http://packages.confluent.io/maven/"]
+                 ])
