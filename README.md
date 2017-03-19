@@ -149,9 +149,55 @@ For more information on setting up lzo correctly see: https://code.google.com/p/
 
 ```
 
+## Avro
+
+*Note on Schemas*
+
+Schemas can either be loaded automatically from an avro schema registry
+by specifying ```:avro-schema-registry-url``` or manually supplied and a mock
+registry passed through using ```:schema-client```. With the latter
+any valid schema client ```io.confluent.kafka.schemaregistry.client.SchemaRegistryClient```
+can be used.
+
+### Clojure
+
+```clojure
+
+(require '[fileape.avro.writer :as awriter] :reload)
+(require '[fileape.core :as ape] :reload)
+(import '(org.apache.avro Schema$Parser))
+(import '(org.apache.avro.generic IndexedRecord GenericData$Record))
+(import '(io.confluent.kafka.schemaregistry.client CachedSchemaRegistryClient MockSchemaRegistryClient))
+
+(defn ^IndexedRecord record [schema]
+  (GenericData$Record. schema))
+
+(defn test-record [sc v]
+  (let [^IndexedRecord r (record sc)]
+    (.put r 0 (System/currentTimeMillis))
+    (.put r 1 (str v))
+    r))
+
+(def SCHEMA (.parse (Schema$Parser.) "{\"type\":\"record\",\"name\":\"encryption_output\",\"fields\":[{\"name\":\"timestamp\",\"type\":\"long\"},{\"name\":\"line\",\"type\":\"string\"}]}"))
+
+(def schema-client (doto (MockSchemaRegistryClient.)
+                         (.register "mytopic" SCHEMA)))
+
+(def ape2 (ape/ape {:codec :avro :base-dir "/tmp/testdir" :avro-codec "snappy" :schema-client schema-client}))
+
+
+;;for each key a valid avro schema must exist in the schema registry or supplied by the schema-client
+
+(ape/write ape2 "mytopic" (fn [{:keys [avro]}]
+							 (awriter/write! avro
+							                     (test-record SCHEMA 1))))
+
+(ape/close ape2)
+```
+
 ## Parquet
 
-*Not on Schemas*
+*Note on Schemas*
 
 This parquet implementation supports the Hive way of representing Maps and Lists.
 
@@ -172,7 +218,7 @@ And the schema is:
                         }
  }
 ```
-I know this is wierd but this is how Hive likes it in parquet.
+I know this is weird but this is how Hive likes it in parquet.
 
 *Maps*
 
@@ -250,6 +296,15 @@ is the function that was sent to the ```ape/write``` function.
 <tr><td>:parquet-codec</td><td>:gzip sets parquet-compression</td></tr>
 <tr><td>:parquet-enable-dictionary</td><td>false</td></tr>
 
+</table>
+
+## Avro Properties
+
+<table border="0">
+<tr><td><b>Name</b></td><td><b>Description</b></td></tr>
+<tr><td>:avro-schema-registry-url</td><td>url to the avro schema registry</td></tr>
+<tr><td>:avro-codec</td><td>valid values are "deflate", "snappy", "bzip2" any invalid or empty value will default to "deflate"</td></tr>
+<tr><td>:schema-client</td><td>either specify :avro-schema-registry-url or :schema-client, schema-client is any valid SchemaRegistryClient instance and will be used instead of the registry url to get schemas if supplied</td></tr>
 </table>
 
 ### Per Key Configuration
