@@ -6,10 +6,9 @@
             [clojure.string :as string])
   (:import
     (org.apache.hadoop.hive.ql.io.parquet.read DataWritableReadSupport)
-    (org.apache.parquet.hadoop ParquetReader ParquetRecordReader)
+    (org.apache.parquet.hadoop ParquetRecordReader)
     (org.apache.hadoop.fs Path)
     (org.apache.hadoop.io ArrayWritable IntWritable DoubleWritable BooleanWritable FloatWritable LongWritable Text)
-    (org.apache.parquet.hadoop.api ReadSupport)
     (org.apache.parquet.tools.read SimpleRecord SimpleRecord$NameValue)
     [org.apache.hadoop.hive.ql.io.parquet.writable BinaryWritable]
     [org.apache.hadoop.mapreduce.lib.input FileSplit]
@@ -17,9 +16,10 @@
     [org.apache.hadoop.hive.ql.io.parquet.convert HiveSchemaConverter]
     [org.apache.parquet.schema MessageType]
     [org.apache.parquet.filter2.compat FilterCompat]
-    [org.apache.hadoop.mapreduce TaskAttemptContext TaskAttemptID TaskID]
+    [org.apache.hadoop.mapreduce TaskAttemptID TaskID]
     [org.apache.hadoop.conf Configuration]
-    [org.apache.hadoop.hive.serde2.typeinfo TypeInfo TypeInfoUtils]))
+    [org.apache.hadoop.hive.serde2.typeinfo TypeInfo TypeInfoUtils]
+    (org.apache.hadoop.mapreduce.task TaskAttemptContextImpl)))
 
 
 (defprotocol IWritable
@@ -121,6 +121,6 @@
 
     (.initialize record-reader
                  (file-split file)
-                 (TaskAttemptContext. (Configuration.) (TaskAttemptID. (TaskID.) (int 0))))
+                 (TaskAttemptContextImpl. (Configuration.) (TaskAttemptID. (TaskID.) (int 0))))
 
     (lazy-seq-hive-records record-reader)))

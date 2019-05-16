@@ -6,11 +6,11 @@
     [fileape.core :as file-ape]
     [midje.sweet :refer :all]
     [clojure.java.io :as io])
-  (:import (java.util Properties Iterator)
+  (:import (java.util Iterator)
            (org.apache.avro Schema$Parser Schema)
-           (io.confluent.kafka.schemaregistry.client CachedSchemaRegistryClient MockSchemaRegistryClient)
+           (io.confluent.kafka.schemaregistry.client MockSchemaRegistryClient)
            (org.apache.avro.generic IndexedRecord GenericData$Record GenericDatumReader)
-           (org.apache.avro.file DataFileReader DataFileWriter)
+           (org.apache.avro.file DataFileReader)
            (java.util.concurrent.atomic AtomicInteger)
            (java.io File)))
 

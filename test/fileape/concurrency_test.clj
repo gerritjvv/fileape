@@ -3,10 +3,9 @@
             [fileape.core :refer :all]
             [midje.sweet :refer :all]
             [clojure.tools.logging :refer [info]])
-  (import [java.io File DataOutputStream FileInputStream DataInputStream]
-          [java.util.concurrent.atomic AtomicInteger]
+  (:import [java.io File DataOutputStream FileInputStream DataInputStream]
           [java.util.zip GZIPInputStream]
-          [java.io File OutputStream]))
+          [java.io File]))
 
 (defn read-file [file]
   (let [o (-> (clojure.java.io/file file) FileInputStream. GZIPInputStream. DataInputStream.)

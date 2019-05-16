@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [fileape.core :refer :all]
             [midje.sweet :refer :all])
-  (import [java.io File DataOutputStream FileInputStream DataInputStream]
+  (:import [java.io File DataOutputStream FileInputStream DataInputStream]
           [java.util.concurrent.atomic AtomicInteger]
           [java.util.zip GZIPInputStream]
           [java.io File]))

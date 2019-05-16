@@ -74,7 +74,9 @@
 (defn move-file [^File source-file ^File dest-file]
   (try
     ;;try our best to do an atomic rename to avoid partial move files being seen, but this is platform dependant
-    (Files/move (.toPath source-file) (.toPath dest-file) (into-array CopyOption [StandardCopyOption/ATOMIC_MOVE StandardCopyOption/COPY_ATTRIBUTES]))
+    (Files/move (.toPath source-file) (.toPath dest-file)
+                ;; remove atomic move, some filesystems do not support this
+                (into-array CopyOption []))
     (catch Exception e
       (do
         (debug e (str "Error while moving " source-file " to " dest-file))
