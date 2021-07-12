@@ -249,8 +249,8 @@ To change what other original types can be written use the multimethod in ```fil
 ;;; note that the callback function sets a :parquet key
 ;;; this contains the open parquet file context
 (ape/write ape2 "a" (fn [{:keys [parquet]}] 
-							(pwriter/write! parquet
-												  {"name" "abc" "id" 1})))
+			(pwriter/write! parquet
+			  {"name" "abc" "id" 1})))
 
 (ape/close ape2)
 ```
