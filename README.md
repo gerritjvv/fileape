@@ -236,20 +236,21 @@ To change what other original types can be written use the multimethod in ```fil
 (require '[fileape.parquet.writer :as pwriter] :reload)
 (require '[fileape.core :as ape] :reload)
 
+(def schema (pwriter/parse-schema "message test{ required binary name; int32 id;}"))
 
-(def ape2 (ape/ape {:codec :parquet :base-dir "/tmp/testdir" :parquet-codec "gzip" :message-type (pwriter/test-schema)}))
+(def ape2 (ape/ape {:codec :parquet :base-dir "/tmp/testdir" :parquet-codec "gzip" :message-type schema}))
 
 ;;for each key we must register a parquet schema and codec
 ;; the fileape.parquet.writer namespace has helper functions for compiling parquet definition schemas
 
-(ape/update-env! ape2 "a" :parquet-codec :gzip :message-type (pwriter/test-schema))
+(ape/update-env! ape2 "a" :parquet-codec :gzip :message-type schema)
 
 
 ;;; note that the callback function sets a :parquet key
 ;;; this contains the open parquet file context
 (ape/write ape2 "a" (fn [{:keys [parquet]}] 
 							(pwriter/write! parquet
-												  {"name" "abc" "addresses" [{"city" "122" "country" "1"}]})))
+												  {"name" "abc" "id" 1})))
 
 (ape/close ape2)
 ```
